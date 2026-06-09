@@ -1,5 +1,17 @@
-# SmartHelm Phase 1 — Central Configuration
+# SmartHelm — Central Configuration
 # All tuneable constants live here. No magic numbers elsewhere.
+
+# ---------------------------------------------------------------------------
+# Helmet identity (used as Firestore document ID in riders/{helmet_id})
+# ---------------------------------------------------------------------------
+HELMET_ID: str             = "helmet-001"        # unique ID per physical helmet
+RIDER_NAME: str            = "Rider"             # overwritten at shift-start QR scan
+FLEET_MANAGER_PHONE: str   = "+91XXXXXXXXXX"     # fleet manager mobile (with country code)
+EMERGENCY_CONTACT_PHONE: str = "+91XXXXXXXXXX"   # emergency contact (with country code)
+
+# Firestore integration — set True once serviceAccountKey.json is placed in backend/
+FIRESTORE_ENABLED: bool    = False
+SERVICE_ACCOUNT_PATH: str  = "serviceAccountKey.json"
 
 # ---------------------------------------------------------------------------
 # Camera sources
