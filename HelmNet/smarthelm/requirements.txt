@@ -5,3 +5,8 @@ numpy>=1.26.0
 paho-mqtt>=2.0.0
 onnxruntime>=1.17.0
 python-gsmmodem-new>=0.9
+
+# Firestore integration (firestore_reporter.py)
+# Install on Pi: pip install firebase-admin>=6.3.0
+# Place serviceAccountKey.json in backend/ before enabling FIRESTORE_ENABLED=True
+firebase-admin>=6.3.0
