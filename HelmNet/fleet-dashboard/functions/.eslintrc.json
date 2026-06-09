@@ -1,0 +1,20 @@
+{
+  "env": {
+    "es2020": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "eqeqeq": "error",
+    "no-var": "error",
+    "prefer-const": "warn",
+    "semi": ["error", "always"],
+    "quotes": ["warn", "double"]
+  }
+}
