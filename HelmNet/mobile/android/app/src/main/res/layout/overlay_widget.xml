@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Floating overlay widget.
+
+  Two children inside a FrameLayout:
+    dot_view      — 22dp circle (idle state, default visible)
+    expanded_view — 240dp pill  (alert state, default GONE)
+
+  OverlayManager toggles visibility between the two states.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- Dot — idle state -->
+    <View
+        android:id="@+id/dot_view"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:background="@drawable/ic_dot"
+        android:elevation="8dp" />
+
+    <!-- Expanded pill — alert state -->
+    <LinearLayout
+        android:id="@+id/expanded_view"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_pill"
+        android:padding="10dp"
+        android:elevation="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/pill_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DROWSY — PULL OVER"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/pill_sub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PERCLOS 0%"
+            android:textColor="#FFCCCC"
+            android:textSize="11sp"
+            android:layout_marginTop="2dp" />
+
+    </LinearLayout>
+
+</FrameLayout>

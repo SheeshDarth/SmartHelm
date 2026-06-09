@@ -1,0 +1,254 @@
+/* SmartHelm Fleet Dashboard — dark theme matching the Pi dashboard */
+
+:root {
+    --bg:        #0d0d0d;
+    --surface:   #1a1a1a;
+    --surface2:  #252525;
+    --border:    #2e2e2e;
+    --green:     #22cc44;
+    --yellow:    #ffa500;
+    --red:       #ff4444;
+    --grey:      #666666;
+    --text:      #e0e0e0;
+    --text-dim:  #888888;
+    --radius:    10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────── */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo { font-size: 18px; font-weight: 700; color: var(--green); }
+.logo span { color: var(--text); font-weight: 400; }
+
+.header-right { display: flex; align-items: center; gap: 16px; }
+
+#summary-pills { display: flex; gap: 8px; }
+.pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+}
+.pill.alert { background: #3a0000; border-color: var(--red); color: var(--red); }
+.pill.active { border-color: var(--green); color: var(--green); }
+
+.btn-signout {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: border-color .2s;
+}
+.btn-signout:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Main layout ─────────────────────────────────── */
+main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+/* ── Fleet table ─────────────────────────────────── */
+.table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+table { width: 100%; border-collapse: collapse; }
+thead { background: var(--surface2); }
+th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-dim);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+
+tbody tr { cursor: pointer; transition: background .15s; }
+tbody tr:hover { background: var(--surface2); }
+
+tbody tr.row-alert   { background: #1a0000; }
+tbody tr.row-offline { opacity: .45; }
+
+/* ── Status badges ───────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .03em;
+}
+.badge.open    { background: #0a2a14; color: var(--green); border: 1px solid #1a5c2a; }
+.badge.closed  { background: #2a0000; color: var(--red);   border: 1px solid #5c1a1a; }
+.badge.unknown { background: #1a1a1a; color: var(--grey);  border: 1px solid #333; }
+.badge.alert   { background: var(--red); color: #fff; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .65; }
+}
+
+/* ── PERCLOS bar ─────────────────────────────────── */
+.perclos-bar-bg {
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 6px;
+    width: 80px;
+    display: inline-block;
+    vertical-align: middle;
+    overflow: hidden;
+    margin-left: 6px;
+}
+.perclos-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--green);
+    transition: width .5s, background .5s;
+}
+.perclos-bar-fill.warn  { background: var(--yellow); }
+.perclos-bar-fill.danger { background: var(--red); }
+
+/* ── Status dot ──────────────────────────────────── */
+.status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.status-dot.green  { background: var(--green); }
+.status-dot.yellow { background: var(--yellow); }
+.status-dot.red    { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.status-dot.grey   { background: var(--grey); }
+
+/* ── Login page ──────────────────────────────────── */
+.login-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 24px;
+}
+.login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    width: 360px;
+    text-align: center;
+}
+.login-card h1 { font-size: 22px; color: var(--green); margin-bottom: 8px; }
+.login-card p  { color: var(--text-dim); margin-bottom: 28px; font-size: 13px; }
+.btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.btn-google:hover { background: #303030; }
+
+/* ── Rider detail ────────────────────────────────── */
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.detail-header a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+.detail-header a:hover { color: var(--text); }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+.stat-card .label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; margin-bottom: 6px; }
+.stat-card .value { font-size: 22px; font-weight: 700; color: var(--text); }
+
+.section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 12px;
+}
+
+.btn-export {
+    display: inline-block;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+.btn-export:hover { border-color: var(--green); color: var(--green); }
+
+/* ── Alert history table ─────────────────────────── */
+.alert-type-perclos          { color: var(--yellow); }
+.alert-type-continuous_closure { color: var(--red); }
+
+/* ── Misc ────────────────────────────────────────── */
+.empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-dim);
+}
+.empty-state h2 { font-size: 18px; margin-bottom: 8px; }
+
+.stale-label { font-size: 11px; color: var(--grey); margin-left: 6px; }
+
+#loading { text-align: center; padding: 80px; color: var(--text-dim); font-size: 16px; }

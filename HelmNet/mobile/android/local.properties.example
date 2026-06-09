@@ -1,0 +1,9 @@
+# Copy this file to local.properties (same directory) and fill in your values.
+# local.properties is gitignored — it must NEVER be committed.
+
+# Android SDK path — set automatically by Android Studio
+sdk.dir=/path/to/your/Android/Sdk
+
+# MSG91 credentials — get from https://msg91.com → Dashboard → API
+MSG91_AUTH_KEY=YOUR_MSG91_AUTH_KEY
+MSG91_SENDER_ID=YOUR_6_CHAR_SENDER_ID

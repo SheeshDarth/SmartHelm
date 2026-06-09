@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="△ SmartHelm"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI Drowsiness Detection"
+            android:textSize="13sp"
+            android:textColor="#888888"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Permission status -->
+        <TextView
+            android:id="@+id/tv_perm_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Checking permissions…"
+            android:textSize="13sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Permission rows -->
+        <LinearLayout android:id="@+id/row_camera"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Camera" android:textColor="#CCCCCC" />
+            <Button android:id="@+id/btn_fix_camera"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="36dp"
+                android:text="Grant" android:textSize="11sp" android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/row_overlay"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Display over other apps" android:textColor="#CCCCCC" />
+            <Button android:id="@+id/btn_fix_overlay"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="36dp"
+                android:text="Grant" android:textSize="11sp" android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/row_battery"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Battery optimization exempt" android:textColor="#CCCCCC" />
+            <Button android:id="@+id/btn_fix_battery"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="36dp"
+                android:text="Grant" android:textSize="11sp" android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/row_notif"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Notifications" android:textColor="#CCCCCC" />
+            <Button android:id="@+id/btn_fix_notif"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="36dp"
+                android:text="Grant" android:textSize="11sp" android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/row_location"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="20dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Location (fleet reporting)" android:textColor="#CCCCCC" />
+            <Button android:id="@+id/btn_fix_location"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="36dp"
+                android:text="Grant" android:textSize="11sp" android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#333333" android:layout_marginBottom="20dp" />
+
+        <!-- Rider name -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Rider Name"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="12dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_rider_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:inputType="textPersonName" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- SMS toggle -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="SMS alert to emergency contact"
+                android:textColor="#CCCCCC" android:textSize="14sp" />
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_sms"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textOn=""
+                android:textOff=""
+                android:showText="false" />
+        </LinearLayout>
+
+        <!-- Emergency contact (shown when SMS enabled) -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layout_emergency_contact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Emergency Contact (+91XXXXXXXXXX)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="20dp"
+            android:visibility="gone">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_emergency_contact"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:inputType="phone" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Start/Stop button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_start"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Start Detection"
+            android:textSize="16sp"
+            android:backgroundTint="#22CC44"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Calibrate button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_calibrate"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Recalibrate EAR Thresholds"
+            android:textSize="14sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Footer -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Overlay dot appears over other apps when detection is active."
+            android:textColor="#666666"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Edit profile / sign out row -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center"
+            android:layout_marginTop="8dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_edit_profile"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="Edit Profile"
+                android:textSize="13sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginEnd="8dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_sign_out"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="Sign Out"
+                android:textSize="13sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:backgroundTint="@android:color/transparent" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

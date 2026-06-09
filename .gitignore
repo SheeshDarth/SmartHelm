@@ -1,0 +1,56 @@
+# ── Android build outputs ────────────────────────────────────────────
+**/build/
+**/.gradle/
+*.apk
+*.aab
+*.ap_
+
+# ── Large binary assets — download separately (see README) ───────────
+# MediaPipe model (~3.6 MB) — download from:
+# https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+**/assets/face_landmarker.task
+**/models/*.task
+**/models/*.onnx
+
+# ── Android sensitive — NEVER commit these ───────────────────────────
+# Contains MSG91_AUTH_KEY and local SDK path
+HelmNet/mobile/android/local.properties
+# Contains Firebase project credentials (API key, sender ID, app ID)
+HelmNet/mobile/android/app/google-services.json
+# Keystore files (signing keys)
+**/*.keystore
+**/*.jks
+
+# ── Firebase / Web sensitive ─────────────────────────────────────────
+# Contains Firebase API key — copy firebase.config.js.example and fill in
+HelmNet/fleet-dashboard/firebase.config.js
+# Environment files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# ── Node / Cloud Functions ───────────────────────────────────────────
+**/node_modules/
+HelmNet/fleet-dashboard/functions/.secret*
+
+# ── IDE / Editor ─────────────────────────────────────────────────────
+.idea/
+*.iml
+**/.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Claude Code internal ─────────────────────────────────────────────
+**/.claude/
+
+# ── Firebase local cache ─────────────────────────────────────────────
+.firebase/
+
+# ── Root-level non-project files ─────────────────────────────────────
+PATH.txt
+settings.txt
+SmartHelm-Round2-MasterPrompt.md
+.idea/

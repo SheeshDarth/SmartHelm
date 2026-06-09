@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0d0d0d"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="△"
+            android:textSize="36sp"
+            android:textColor="#22cc44"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Set up your profile"
+            android:textSize="26sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Takes 30 seconds. Used for emergency alerts when drowsiness is detected."
+            android:textSize="13sp"
+            android:textColor="#666666"
+            android:lineSpacingMultiplier="1.4"
+            android:layout_marginBottom="36dp" />
+
+        <!-- ─── YOUR DETAILS ─────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="YOUR DETAILS"
+            android:textSize="11sp"
+            android:textColor="#444444"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Your name"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="8dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textPersonName|textCapWords"
+                android:textColor="#FFFFFF"
+                android:imeOptions="actionNext" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Your phone number"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="4dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_rider_phone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="phone"
+                android:textColor="#AAAAAA"
+                android:enabled="false" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Verified via OTP"
+            android:textSize="11sp"
+            android:textColor="#22cc44"
+            android:paddingStart="4dp"
+            android:layout_marginBottom="28dp" />
+
+        <!-- ─── FLEET MANAGER ────────────────────────── -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#1c1c1c" android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="FLEET MANAGER"
+            android:textSize="11sp"
+            android:textColor="#444444"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Your manager receives an SMS the moment a drowsiness alert fires."
+            android:textSize="12sp"
+            android:textColor="#555555"
+            android:lineSpacingMultiplier="1.4"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Fleet manager phone  (+91XXXXXXXXXX)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="28dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_fleet_manager"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="phone"
+                android:textColor="#FFFFFF"
+                android:imeOptions="actionNext" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ─── EMERGENCY CONTACT ───────────────────── -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#1c1c1c" android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="EMERGENCY CONTACT"
+            android:textSize="11sp"
+            android:textColor="#444444"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="A family member or friend also alerted when you're drowsy."
+            android:textSize="12sp"
+            android:textColor="#555555"
+            android:lineSpacingMultiplier="1.4"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Emergency contact phone  (+91XXXXXXXXXX)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_marginBottom="36dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_emergency"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="phone"
+                android:textColor="#FFFFFF"
+                android:imeOptions="actionDone" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- CTA -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_get_started"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Get Started →"
+            android:textSize="16sp"
+            android:backgroundTint="#22cc44" />
+
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#ff4444"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Fleet manager and emergency contact fields are optional but strongly recommended."
+            android:textColor="#333333"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.4"
+            android:layout_marginTop="20dp" />
+
+    </LinearLayout>
+</ScrollView>

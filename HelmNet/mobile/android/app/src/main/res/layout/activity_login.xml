@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0d0d0d"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingHorizontal="32dp"
+        android:paddingTop="72dp"
+        android:paddingBottom="40dp">
+
+        <!-- Logo mark -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="△"
+            android:textSize="52sp"
+            android:textColor="#22cc44"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SmartHelm"
+            android:textSize="30sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Driver Safety Platform"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="52dp" />
+
+        <!-- ── Phone section ───────────────────────────── -->
+        <LinearLayout
+            android:id="@+id/layout_phone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SIGN IN"
+                android:textSize="11sp"
+                android:textColor="#444444"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Phone number  (+91XXXXXXXXXX)"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="20dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="phone"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#555555" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_send_otp"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Send OTP"
+                android:textSize="16sp"
+                android:backgroundTint="#22cc44" />
+
+        </LinearLayout>
+
+        <!-- ── OTP section (hidden until code sent) ────── -->
+        <LinearLayout
+            android:id="@+id/layout_otp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_otp_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enter the 6-digit code"
+                android:textColor="#888888"
+                android:textSize="14sp"
+                android:layout_marginBottom="16dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="6-digit OTP"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="20dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_otp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberPassword"
+                    android:maxLength="6"
+                    android:textColor="#FFFFFF"
+                    android:letterSpacing="0.4"
+                    android:textSize="22sp"
+                    android:gravity="center" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_verify"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Verify &amp; Continue →"
+                android:textSize="16sp"
+                android:backgroundTint="#22cc44"
+                android:layout_marginBottom="20dp" />
+
+            <TextView
+                android:id="@+id/btn_resend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="← Change number / Resend OTP"
+                android:textColor="#22cc44"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:paddingVertical="10dp"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
+        <!-- Loading + error -->
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_marginTop="24dp" />
+
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#ff4444"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:layout_marginTop="14dp"
+            android:visibility="gone" />
+
+        <!-- Footer note -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="We'll send a one-time code to verify your number."
+            android:textColor="#333333"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginTop="40dp" />
+
+    </LinearLayout>
+</ScrollView>
