@@ -34,9 +34,11 @@ exports.sendDrowsinessAlert = onDocumentUpdated(
       return null;
     }
 
-    const riderName = (after.riderName || "the rider").trim();
-    const emergency = (after.emergencyContact || "").trim();
-    const manager   = (after.managerId        || "").trim();
+    const riderName  = (after.riderName || "the rider").trim();
+    const emergency  = (after.emergencyContact || "").trim();
+    const manager    = (after.managerId        || "").trim();
+    const perclos    = after.perclos ? `${parseFloat(after.perclos).toFixed(1)}%` : null;
+    const alertType  = after.continuousClosureSec >= 1.5 ? "prolonged eye closure" : "high drowsiness score";
 
     // Normalise numbers: strip leading + so MSG91 gets 91XXXXXXXXXX
     const toMobiles = [
@@ -53,9 +55,8 @@ exports.sendDrowsinessAlert = onDocumentUpdated(
       return null;
     }
 
-    const message =
-      `SmartHelm Alert: ${riderName} is showing signs of drowsiness. ` +
-      `Please check in immediately.`;
+    const detail  = perclos ? ` (PERCLOS ${perclos}, ${alertType})` : ` (${alertType})`;
+    const message = `SmartHelm Alert: ${riderName} detected drowsy${detail}. Please check in immediately.`;
 
     const payload = JSON.stringify({
       sender:  MSG91_SENDER_ID.value(),
