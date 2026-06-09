@@ -224,13 +224,21 @@ header{
 }
 
 /* Bio row */
-.bio-row{display:flex;gap:5px}
+.bio-row{display:flex;gap:5px;flex-wrap:wrap}
 .bio{
   flex:1;background:var(--card2);border-radius:5px;
   padding:5px 5px 4px;text-align:center;border:1px solid var(--border);
 }
 .bio-val{font-size:.9rem;font-weight:800;font-family:var(--mono);line-height:1}
 .bio-unit{font-size:.54rem;color:var(--dim);margin-top:2px;font-family:var(--sans)}
+.bio-sensor-badge{
+  display:none;width:100%;margin-top:4px;
+  font-size:.52rem;font-family:var(--mono);font-weight:700;letter-spacing:.04em;
+  padding:2px 7px;border-radius:3px;
+  background:rgba(0,229,255,.08);color:#00e5ff;
+  border:1px solid rgba(0,229,255,.30);
+  text-align:center;
+}
 
 /* Stage pips */
 .stage-row{display:flex;align-items:center;gap:5px;font-size:.6rem}
@@ -656,6 +664,7 @@ function buildDOM() {
         <div class="bio-val" id="upt-${i}" style="color:var(--mid)">--</div>
         <div class="bio-unit">On Duty</div>
       </div>
+      <div class="bio-sensor-badge" id="biosensor-${i}">● MAX30102 SENSOR</div>
     </div>
 
     <!-- Stage pips -->
@@ -1214,9 +1223,21 @@ function updateRiderDOM(r, i, now) {
   cfill.className = "meter-fill " + (r.continuousClosure >= 4 ? "mf-red" : r.continuousClosure >= 2 ? "mf-amber" : "mf-green");
   document.getElementById(`cval-${i}`).textContent = r.continuousClosure.toFixed(1) + "s";
 
-  // Biometrics
-  document.getElementById(`bpm-${i}`).textContent  = Math.round(r.bpm);
-  document.getElementById(`spo2-${i}`).textContent = r.spo2.toFixed(1);
+  // Biometrics — show real Pi MAX30102 values when available
+  const bpmEl   = document.getElementById(`bpm-${i}`);
+  const spo2El  = document.getElementById(`spo2-${i}`);
+  const bioSnsr = document.getElementById(`biosensor-${i}`);
+  bpmEl.textContent  = Math.round(r.bpm);
+  spo2El.textContent = r.spo2.toFixed(1);
+  if (r._realBio) {
+    bpmEl.style.color  = '#ff4081';   // brighter pink = real sensor data
+    spo2El.style.color = '#00e5ff';   // bright cyan  = real sensor data
+    if (bioSnsr) bioSnsr.style.display = 'block';
+  } else {
+    bpmEl.style.color  = 'var(--red)';
+    spo2El.style.color = 'var(--cyan)';
+    if (bioSnsr) bioSnsr.style.display = 'none';
+  }
   const sec = Math.floor((now - r.startTime) / 1000);
   const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60);
   const uptEl = document.getElementById(`upt-${i}`);
@@ -1578,6 +1599,16 @@ function injectLiveData(deviceId, data) {
   r.ear         = r.eyeState === 'CLOSED' ? 0.13 : 0.30;
   r.faceLock    = data.faceDetected ? 94 : 35;
   r.faceDetected = !!data.faceDetected;
+
+  // Pi biometrics — MAX30102 heart-rate + SpO2 (only present for Pi-helmet riders)
+  if (data.heartRate && parseFloat(data.heartRate) > 0) {
+    r.bpm      = parseFloat(data.heartRate);
+    r._realBio = true;
+  }
+  if (data.spo2 && parseFloat(data.spo2) > 0) {
+    r.spo2     = parseFloat(data.spo2);
+    r._realBio = true;
+  }
 
   // Parse landmark arrays from Firestore [x1,y1,x2,y2,...] → [[x,y],...]
   r._eyeLandmarks = {
