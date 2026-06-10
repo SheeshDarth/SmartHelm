@@ -14,6 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.SetOptions
 import com.smarthelm.mobile.detection.DetectionResult
+import com.smarthelm.mobile.detection.FatigueResult
 import com.smarthelm.mobile.detection.PerclosResult
 import java.io.ByteArrayOutputStream
 
@@ -53,6 +54,8 @@ class FirestoreReporter(
     private var lastSnapshotMs  = 0L
     private var prevAlertActive = false
     private var lastLocation: GeoPoint? = null
+    private var lastSpeedKmph: Float = -1f   // -1 = unknown
+    private var lastBearing: Float   = -1f
 
     // Reusable paints — allocated once
     private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.8f }
@@ -62,20 +65,31 @@ class FirestoreReporter(
     }
     private val tintPaint = Paint()
 
-    fun setLastLocation(lat: Double, lng: Double) { lastLocation = GeoPoint(lat, lng) }
+    fun setLastLocation(lat: Double, lng: Double, speedKmph: Float = -1f, bearing: Float = -1f) {
+        lastLocation  = GeoPoint(lat, lng)
+        lastSpeedKmph = speedKmph
+        lastBearing   = bearing
+    }
 
     // ── Status push ──────────────────────────────────────────────────────────
 
-    fun onFrame(det: DetectionResult, perc: PerclosResult) {
-        val now       = SystemClock.elapsedRealtime()
-        val alertEdge = perc.alertActive != prevAlertActive
-        prevAlertActive = perc.alertActive
+    /**
+     * @param fatigue the fused [FatigueResult]; when present its [FatigueResult.alertActive] is the
+     *   authoritative alert (already debounced + speed-gated), so the dashboard and the on-device
+     *   alarm agree. Falls back to [PerclosResult.alertActive] for older callers.
+     */
+    fun onFrame(det: DetectionResult, perc: PerclosResult, fatigue: FatigueResult? = null) {
+        val now            = SystemClock.elapsedRealtime()
+        val effectiveAlert = fatigue?.alertActive ?: perc.alertActive
+        val alertEdge      = effectiveAlert != prevAlertActive
+        prevAlertActive    = effectiveAlert
 
         if (!alertEdge && (now - lastPushMs) < THROTTLE_MS) return
         lastPushMs = now
 
         val leftFlat  = det.leftEyeNorm.flatMap  { listOf(it.first, it.second) }
         val rightFlat = det.rightEyeNorm.flatMap { listOf(it.first, it.second) }
+        val alertType = fatigue?.cause?.ifBlank { perc.alertType } ?: perc.alertType
 
         val status = hashMapOf<String, Any?>(
             "riderName"            to riderName,
@@ -84,7 +98,8 @@ class FirestoreReporter(
             "eyeState"             to det.eyeState,
             "perclos"              to perc.perclos,
             "continuousClosureSec" to perc.continuousClosureSec,
-            "alertActive"          to perc.alertActive,
+            "alertActive"          to effectiveAlert,
+            "alertType"            to alertType,
             "faceDetected"         to det.faceDetected,
             "eyeLandmarksLeft"     to leftFlat,
             "eyeLandmarksRight"    to rightFlat,
@@ -92,17 +107,27 @@ class FirestoreReporter(
             "connected"            to true,
             "updatedAt"            to FieldValue.serverTimestamp()
         )
-        if (alertEdge) status["smsNeeded"] = perc.alertActive
+        if (lastSpeedKmph >= 0f) status["speedKmph"] = lastSpeedKmph
+        if (lastBearing   >= 0f) status["heading"]   = lastBearing
+        if (fatigue != null) {
+            status["fatigueScore"]     = fatigue.score
+            status["fatigueLevel"]     = fatigue.level
+            status["fatigueBreakdown"] = fatigue.breakdown
+            status["yawnCount"]        = fatigue.yawnCount
+            status["blinkRate"]        = fatigue.blinkRate
+        }
+        if (alertEdge) status["smsNeeded"] = effectiveAlert
 
         db.collection("riders").document(deviceId)
             .set(status, SetOptions.merge())
             .addOnFailureListener { e -> Log.w(TAG, "Status push failed: ${e.message}") }
 
-        if (alertEdge && perc.alertActive) {
+        if (alertEdge && effectiveAlert) {
             val alertDoc = hashMapOf<String, Any?>(
-                "type"          to if (perc.alertContinuous) "CONTINUOUS_CLOSURE" else "PERCLOS",
+                "type"          to alertType.ifBlank { if (perc.alertContinuous) "CONTINUOUS_CLOSURE" else "PERCLOS" },
                 "perclos"       to perc.perclos,
                 "continuousSec" to perc.continuousClosureSec,
+                "fatigueScore"  to (fatigue?.score ?: 0f),
                 "location"      to lastLocation,
                 "timestamp"     to FieldValue.serverTimestamp()
             )

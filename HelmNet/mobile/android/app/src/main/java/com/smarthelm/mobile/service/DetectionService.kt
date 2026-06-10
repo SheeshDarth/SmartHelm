@@ -36,6 +36,7 @@ import com.smarthelm.mobile.R
 import com.smarthelm.mobile.alert.AlertManager
 import com.smarthelm.mobile.cloud.FirestoreReporter
 import com.smarthelm.mobile.detection.EyeDetector
+import com.smarthelm.mobile.detection.FatigueScorer
 import com.smarthelm.mobile.detection.PerclosTracker
 import com.smarthelm.mobile.overlay.OverlayManager
 import com.smarthelm.mobile.util.Prefs
@@ -67,6 +68,7 @@ class DetectionService : LifecycleService() {
 
     private lateinit var eyeDetector:    EyeDetector
     private lateinit var perclosTracker: PerclosTracker
+    private lateinit var fatigueScorer:  FatigueScorer
     private lateinit var alertManager:   AlertManager
     private lateinit var overlayManager: OverlayManager
     private lateinit var firestoreReporter: FirestoreReporter
@@ -79,6 +81,9 @@ class DetectionService : LifecycleService() {
     @Volatile private var thermalThrottle = false
     private var frameCounter = 0
 
+    // Latest speed (km/h) from the location stream; -1 = unknown (no speed-gating)
+    @Volatile private var currentSpeedKmph = -1f
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
@@ -89,6 +94,7 @@ class DetectionService : LifecycleService() {
 
         eyeDetector    = EyeDetector(this)
         perclosTracker = PerclosTracker()
+        fatigueScorer  = FatigueScorer()
         alertManager   = AlertManager(this)
         overlayManager = OverlayManager(this)
 
@@ -189,20 +195,22 @@ class DetectionService : LifecycleService() {
 
             val detection     = eyeDetector.process(mpImage, tsMs)
             val perclosResult = perclosTracker.update(detection.eyeState)
+            // Fused, debounced, speed-gated verdict — the single source of truth for alerting
+            val fatigue       = fatigueScorer.update(detection, perclosResult, currentSpeedKmph)
 
-            if (perclosResult.alertActive) alertManager.trigger() else alertManager.clear()
+            if (fatigue.alertActive) alertManager.trigger() else alertManager.clear()
 
             // Overlay update must run on main thread
             mainHandler.post { overlayManager.update(detection, perclosResult) }
 
-            // Firestore status push (smart-throttled internally)
-            firestoreReporter.onFrame(detection, perclosResult)
+            // Firestore status push (smart-throttled internally) — fatigue is authoritative
+            firestoreReporter.onFrame(detection, perclosResult, fatigue)
 
             // Live snapshot: annotated frame with landmarks, orientation-corrected
             firestoreReporter.maybeUpdateSnapshot(
                 bitmap,
                 imageProxy.imageInfo.rotationDegrees,
-                perclosResult.alertActive,
+                fatigue.alertActive,
                 detection
             )
             bitmap.recycle()   // safe: MediaPipe already consumed it synchronously
@@ -227,7 +235,10 @@ class DetectionService : LifecycleService() {
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             val loc = result.lastLocation ?: return
-            firestoreReporter.setLastLocation(loc.latitude, loc.longitude)
+            val speedKmph = if (loc.hasSpeed())   loc.speed * 3.6f else -1f
+            val bearing   = if (loc.hasBearing()) loc.bearing      else -1f
+            currentSpeedKmph = speedKmph
+            firestoreReporter.setLastLocation(loc.latitude, loc.longitude, speedKmph, bearing)
         }
     }
 
