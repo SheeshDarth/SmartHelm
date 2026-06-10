@@ -46,6 +46,9 @@ desktop.ini
 # ── Claude Code internal ─────────────────────────────────────────────
 **/.claude/
 
+# ── graphify knowledge graph (regenerate with /graphify) ─────────────
+graphify-out/
+
 # ── Firebase local cache ─────────────────────────────────────────────
 .firebase/
 
