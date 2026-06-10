@@ -3,46 +3,47 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ── Rider status documents ──────────────────────────────────────────
-    // Each rider device writes only its own document.
-    // Fleet managers (and the Cloud Function service account) may read all.
+    // Identity note: a rider device's document id is a random UUID
+    // (Prefs.getDeviceId), which is NOT the same as the Firebase Auth uid
+    // (the rider signs in with Phone Auth). So we CANNOT gate writes on
+    // request.auth.uid == deviceId — that would reject every device write.
+    // We gate on authentication + light schema validation instead.
     match /riders/{deviceId} {
 
-      // Any authenticated user may read rider data (fleet dashboard).
-      allow read: if request.auth != null;
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && isValidRiderUpdate(request.resource.data);
 
-      // A device may only write its own document and only if the
-      // incoming data passes basic shape validation.
-      allow write: if request.auth != null
-                   && request.auth.uid == deviceId
-                   && isValidRiderDoc(request.resource.data);
-
-      // Alert subcollection — append-only by the owning device.
+      // Alert subcollection — append-only, never edited or deleted.
       match /alerts/{alertId} {
         allow read:   if request.auth != null;
-        allow create: if request.auth != null
-                      && request.auth.uid == deviceId;
-        allow update, delete: if false;   // immutable alert log
+        allow create: if request.auth != null;
+        allow update, delete: if false;
       }
 
-      // Session stats — written by the owning device only.
+      // Session stats.
       match /session/{doc} {
         allow read:  if request.auth != null;
-        allow write: if request.auth != null
-                     && request.auth.uid == deviceId;
+        allow write: if request.auth != null;
+      }
+
+      // Breadcrumb track points (F1/F2) — append-only.
+      match /track/{point} {
+        allow read:   if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if false;
       }
     }
 
-    // ── Validation helpers ──────────────────────────────────────────────
-    function isValidRiderDoc(data) {
-      return data.keys().hasAll(['riderName', 'eyeState', 'connected', 'updatedAt'])
-          && data.eyeState  in ['OPEN', 'CLOSED', 'UNKNOWN']
-          && data.connected is bool
-          && data.riderName is string
-          && data.riderName.size() <= 80
-          // perclos must be a number in [0, 100] when present
-          && (!('perclos' in data) || (data.perclos >= 0 && data.perclos <= 100))
-          // updatedAt must be a server timestamp (prevents client clock spoofing)
-          && data.updatedAt == request.time;
+    // ── Validation ──────────────────────────────────────────────────────
+    // Every field check is conditional on the field being present, so that
+    // partial merge-updates (snapshot-only, heartbeat-only, trip-only) all
+    // pass. A field is validated only when it is actually being written.
+    function isValidRiderUpdate(data) {
+      return (!('eyeState'  in data) || data.eyeState in ['OPEN', 'CLOSED', 'UNKNOWN'])
+          && (!('connected' in data) || data.connected is bool)
+          && (!('riderName' in data) || (data.riderName is string && data.riderName.size() <= 80))
+          && (!('perclos'   in data) || (data.perclos is number && data.perclos >= 0 && data.perclos <= 100))
+          && (!('appState'  in data) || data.appState in ['FOREGROUND', 'BACKGROUND', 'ENDED']);
     }
   }
 }
