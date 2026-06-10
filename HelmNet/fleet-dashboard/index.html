@@ -270,8 +270,13 @@ header{
   font-family:var(--mono);
 }
 
-/* Fleet map */
-#fleet-map{display:block;width:100%;height:196px;background:#080f1c}
+/* Fleet map (Leaflet) */
+#fleet-map{width:100%;height:220px;background:#080f1c;border-radius:6px;z-index:0}
+.leaflet-container{background:#080f1c;font-family:var(--sans)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#161616;color:var(--text);border:1px solid #2a2a2a;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.leaflet-popup-content{font-size:.66rem;margin:8px 10px;line-height:1.5}
+.leaflet-bar a{background:#1a1a1a;color:var(--mid);border-color:#2a2a2a}
+.leaflet-bar a:hover{background:#252525}
 
 /* Route list */
 .route-item{
@@ -333,6 +338,9 @@ footer{
   font-family:var(--mono);font-size:1.5rem;font-weight:800;line-height:1;
 }
 </style>
+<!-- Leaflet — real map tiles for live driver positions (F1) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 
@@ -422,10 +430,10 @@ footer{
     <!-- Fleet Map -->
     <div class="panel-section">
       <div class="panel-head">
-        ⬡ Live Positions &amp; Drowsiness Heatmap
-        <span style="color:var(--cyan);font-size:.56rem">SIM GPS</span>
+        ⬡ Live Driver Positions
+        <span style="color:var(--cyan);font-size:.56rem">LIVE GPS · OSM</span>
       </div>
-      <canvas id="fleet-map"></canvas>
+      <div id="fleet-map"></div>
     </div>
 
     <!-- Route List -->
@@ -939,86 +947,72 @@ const ROADS = [
   [[.80,.50],[.70,.70]],
 ];
 
+// ── Leaflet live map (F1) — real OSM tiles, real driver GPS from Firestore ──
+let _fleetMap = null, _mapMarkers = {}, _mapFitted = false;
+const _BLR = [12.9716, 77.5946];
+const _SIM_BBOX = { latTop: 13.04, latBot: 12.90, lngL: 77.54, lngR: 77.70 };
+
+function _initFleetMap() {
+  if (_fleetMap || typeof L === "undefined") return;
+  const el = document.getElementById("fleet-map");
+  if (!el) return;
+  _fleetMap = L.map(el, { zoomControl: false, attributionControl: false }).setView(_BLR, 12);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    { maxZoom: 19, subdomains: "abcd" }).addTo(_fleetMap);
+  L.control.zoom({ position: "bottomright" }).addTo(_fleetMap);
+  setTimeout(() => { if (_fleetMap) _fleetMap.invalidateSize(); }, 250);
+}
+
+// Live riders use their real GPS (r.lat/r.lng from Firestore `location`);
+// simulated riders are spread deterministically across a Bangalore bbox.
+function _riderLatLng(r, slot) {
+  if (typeof r.lat === "number" && typeof r.lng === "number") return [r.lat, r.lng];
+  const y = (typeof r.mapY === "number") ? r.mapY : ((slot * 0.17 + 0.2) % 0.8 + 0.1);
+  const x = (typeof r.mapX === "number") ? r.mapX : ((slot * 0.23 + 0.15) % 0.8 + 0.1);
+  return [_SIM_BBOX.latTop - y * (_SIM_BBOX.latTop - _SIM_BBOX.latBot),
+          _SIM_BBOX.lngL  + x * (_SIM_BBOX.lngR  - _SIM_BBOX.lngL)];
+}
+
 function drawMap() {
-  const cv = document.getElementById("fleet-map");
-  if (!cv) return;
-  if (!cv._sized) { cv.width = cv.offsetWidth || 308; cv.height = 196; cv._sized = true; }
-  const ctx = cv.getContext("2d");
-  const W = cv.width, H = cv.height;
-
-  ctx.fillStyle = "#080f1c"; ctx.fillRect(0,0,W,H);
-
-  // ── Drowsiness heatmap ──
-  HOTSPOTS.forEach(h => {
-    const gx = h.x * W, gy = h.y * H, gr = h.r * Math.min(W,H);
-    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-    const alpha = h.intensity * .45;
-    g.addColorStop(0,   `rgba(255,23,68,${alpha})`);
-    g.addColorStop(.4,  `rgba(255,179,0,${alpha*.6})`);
-    g.addColorStop(1,   "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(gx-gr, gy-gr, gr*2, gr*2);
-  });
-
-  // ── Roads ──
-  ROADS.forEach((pts, ri) => {
-    ctx.beginPath();
-    pts.forEach(([x,y],j) => j ? ctx.lineTo(x*W,y*H) : ctx.moveTo(x*W,y*H));
-    ctx.strokeStyle = ri < 2 ? "rgba(40,70,120,.9)" : "rgba(28,50,88,.7)";
-    ctx.lineWidth   = ri < 2 ? 2.5 : 1.5;
-    ctx.stroke();
-  });
-
-  // City tag
-  ctx.fillStyle = "rgba(80,120,170,.35)";
-  ctx.font = "bold 10px 'Segoe UI', sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("BANGALORE", W*.5, H*.5+3);
-
-  // Hotspot labels (tiny)
-  HOTSPOTS.forEach(h => {
-    ctx.fillStyle = "rgba(255,100,80,.5)";
-    ctx.font = "6.5px 'Segoe UI', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(h.label, h.x*W, h.y*H - h.r*Math.min(W,H) - 3);
-  });
-
-  // ── Rider dots ──
-  const now = Date.now();
-  RIDERS.forEach(r => {
-    r.mapX = clamp(r.mapX + r.mapDX, .07, .93);
-    r.mapY = clamp(r.mapY + r.mapDY, .07, .93);
-    if (r.mapX <= .07 || r.mapX >= .93) r.mapDX *= -1;
-    if (r.mapY <= .07 || r.mapY >= .93) r.mapDY *= -1;
-    const px = r.mapX * W, py = r.mapY * H;
-
-    // Pulse halo for warning/critical
-    if (r.alertActive) {
-      const pulseR = 11 + 6 * Math.abs(Math.sin(now / 300));
-      const haloColor = r.alertStage >= 3 ? "rgba(224,64,251," : r.alertStage >= 2 ? "rgba(255,23,68," : "rgba(255,179,0,";
-      ctx.beginPath(); ctx.arc(px, py, pulseR, 0, Math.PI*2);
-      ctx.strokeStyle = haloColor + ".55)"; ctx.lineWidth = 2; ctx.stroke();
-      ctx.beginPath(); ctx.arc(px, py, pulseR * .6, 0, Math.PI*2);
-      ctx.strokeStyle = haloColor + ".25)"; ctx.lineWidth = 1; ctx.stroke();
+  _initFleetMap();
+  if (!_fleetMap) return;
+  const liveLL = [];
+  RIDERS.forEach((r, slot) => {
+    const ll = _riderLatLng(r, slot);
+    const alert = !!r.alertActive;
+    const stroke = alert
+      ? (r.alertStage >= 3 ? "#e040fb" : r.alertStage >= 2 ? "#ff1744" : "#ffb300")
+      : (r.isLive ? "#00e5ff" : "rgba(255,255,255,.45)");
+    let m = _mapMarkers[slot];
+    if (!m) {
+      m = L.circleMarker(ll, { radius: 7, weight: 2 }).addTo(_fleetMap);
+      m.bindPopup("");
+      m.on("click", () => {
+        const c = document.getElementById("card-" + slot);
+        if (c) c.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      _mapMarkers[slot] = m;
+    } else {
+      m.setLatLng(ll);
     }
-
-    // Dot
-    ctx.beginPath(); ctx.arc(px, py, 5.5, 0, Math.PI*2);
-    ctx.fillStyle = r.color; ctx.fill();
-
-    // Direction
-    const ang = Math.atan2(r.mapDY, r.mapDX);
-    ctx.beginPath();
-    ctx.moveTo(px + Math.cos(ang)*9, py + Math.sin(ang)*9);
-    ctx.lineTo(px + Math.cos(ang)*5, py + Math.sin(ang)*5);
-    ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.stroke();
-
-    // Name
-    ctx.fillStyle = r.color;
-    ctx.font = "7px 'Segoe UI', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(r.name.split(" ")[0], px, py - 10);
+    m.setStyle({
+      color: stroke, fillColor: r.color || "#888", fillOpacity: 0.9,
+      radius: (r.isLive ? 8 : 6) + (alert ? 3 : 0)
+    });
+    const spd = (typeof r.speedKmph === "number") ? Math.round(r.speedKmph) + " km/h" : "—";
+    m.setPopupContent(
+      "<b>" + (r.name || "Rider") + "</b>" + (r.isLive ? " · &#9679; LIVE" : "") +
+      "<br>" + (r.eyeState || "—") + " &middot; PERCLOS " + Math.round(r.perclos || 0) +
+      "% &middot; " + spd
+    );
+    if (r.isLive) liveLL.push(ll);
   });
+  // Zoom to the live rider(s) once a real GPS fix arrives
+  if (!_mapFitted && liveLL.length) {
+    _mapFitted = true;
+    if (liveLL.length === 1) _fleetMap.setView(liveLL[0], 15);
+    else _fleetMap.fitBounds(liveLL, { padding: [30, 30] });
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1567,6 +1561,7 @@ function releaseSlot(deviceId) {
     r.isLive = false;
     r._snapImg = null;
     r._eyeLandmarks = null;
+    r.lat = null; r.lng = null; r.speedKmph = null;   // revert map marker to simulated position
   }
   const badgeEl = document.getElementById(`live-badge-${slot}`);
   if (badgeEl) badgeEl.style.display = 'none';
@@ -1609,6 +1604,13 @@ function injectLiveData(deviceId, data) {
     r.spo2     = parseFloat(data.spo2);
     r._realBio = true;
   }
+
+  // Real GPS position + speed (F1) — drives the live Leaflet map marker
+  if (data.location && typeof data.location.latitude === "number") {
+    r.lat = data.location.latitude;
+    r.lng = data.location.longitude;
+  }
+  if (typeof data.speedKmph === "number") r.speedKmph = data.speedKmph;
 
   // Parse landmark arrays from Firestore [x1,y1,x2,y2,...] → [[x,y],...]
   r._eyeLandmarks = {
