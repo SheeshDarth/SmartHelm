@@ -57,6 +57,11 @@ class FirestoreReporter(
     private var lastSpeedKmph: Float = -1f   // -1 = unknown
     private var lastBearing: Float   = -1f
 
+    // Trip / liveness state (F2 — app-off-mid-trip safety concern)
+    private var tripId: String? = null
+    private var tripActive = false
+    private var appState = "FOREGROUND"      // FOREGROUND | BACKGROUND | ENDED
+
     // Reusable paints — allocated once
     private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.8f }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -69,6 +74,46 @@ class FirestoreReporter(
         lastLocation  = GeoPoint(lat, lng)
         lastSpeedKmph = speedKmph
         lastBearing   = bearing
+    }
+
+    // ── Trip / heartbeat (F2) ──────────────────────────────────────────────────
+    // The dashboard distinguishes a graceful trip end (appState=ENDED / connected=false)
+    // from a rider going dark mid-trip (tripActive=true, appState!=ENDED, heartbeat stale).
+
+    fun setAppState(state: String) { appState = state }
+
+    fun startTrip(id: String) {
+        tripId = id
+        tripActive = true
+        pushTrip(mapOf(
+            "tripActive"     to true,
+            "tripId"         to id,
+            "tripStartedAt"  to FieldValue.serverTimestamp(),
+            "appState"       to appState
+        ))
+    }
+
+    /** Lightweight liveness ping — keeps lastHeartbeatAt fresh even when frames stall. */
+    fun heartbeat() {
+        if (!tripActive) return
+        pushTrip(mapOf("tripActive" to true, "appState" to appState))
+    }
+
+    /** Graceful trip end — must NOT raise a safety concern on the dashboard. */
+    fun endTrip() {
+        tripActive = false
+        appState = "ENDED"
+        pushTrip(mapOf("tripActive" to false, "appState" to "ENDED"))
+    }
+
+    private fun pushTrip(extra: Map<String, Any?>) {
+        val doc = HashMap<String, Any?>(extra)
+        doc["connected"]       = true
+        doc["lastHeartbeatAt"] = FieldValue.serverTimestamp()
+        doc["updatedAt"]       = FieldValue.serverTimestamp()
+        db.collection("riders").document(deviceId)
+            .set(doc, SetOptions.merge())
+            .addOnFailureListener { e -> Log.w(TAG, "Trip push failed: ${e.message}") }
     }
 
     // ── Status push ──────────────────────────────────────────────────────────
@@ -104,9 +149,13 @@ class FirestoreReporter(
             "eyeLandmarksLeft"     to leftFlat,
             "eyeLandmarksRight"    to rightFlat,
             "location"             to lastLocation,
+            "tripActive"           to tripActive,
+            "appState"             to appState,
+            "lastHeartbeatAt"      to FieldValue.serverTimestamp(),
             "connected"            to true,
             "updatedAt"            to FieldValue.serverTimestamp()
         )
+        tripId?.let { status["tripId"] = it }
         if (lastSpeedKmph >= 0f) status["speedKmph"] = lastSpeedKmph
         if (lastBearing   >= 0f) status["heading"]   = lastBearing
         if (fatigue != null) {
@@ -191,7 +240,8 @@ class FirestoreReporter(
             db.collection("riders").document(deviceId)
                 .update(
                     "snapshot",          b64,
-                    "snapshotUpdatedAt", FieldValue.serverTimestamp()
+                    "snapshotUpdatedAt", FieldValue.serverTimestamp(),
+                    "updatedAt",         FieldValue.serverTimestamp()
                 )
                 .addOnFailureListener { e -> Log.w(TAG, "Snapshot push failed: ${e.message}") }
 

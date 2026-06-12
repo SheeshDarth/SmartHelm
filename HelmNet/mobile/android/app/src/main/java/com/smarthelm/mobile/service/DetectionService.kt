@@ -21,7 +21,10 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import android.util.Size
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -40,6 +43,7 @@ import com.smarthelm.mobile.detection.FatigueScorer
 import com.smarthelm.mobile.detection.PerclosTracker
 import com.smarthelm.mobile.overlay.OverlayManager
 import com.smarthelm.mobile.util.Prefs
+import java.util.UUID
 import java.util.concurrent.Executors
 
 /**
@@ -64,6 +68,7 @@ class DetectionService : LifecycleService() {
         const val CHANNEL_ALERTS    = "smarthelm_alerts"
         private const val NOTIF_ID  = 1001
         private const val TAG       = "DetectionService"
+        private const val HEARTBEAT_MS = 15_000L   // F2 liveness ping cadence
     }
 
     private lateinit var eyeDetector:    EyeDetector
@@ -83,6 +88,21 @@ class DetectionService : LifecycleService() {
 
     // Latest speed (km/h) from the location stream; -1 = unknown (no speed-gating)
     @Volatile private var currentSpeedKmph = -1f
+
+    // Trip + heartbeat (F2). A unique trip id per service start; heartbeat keeps the rider
+    // "alive" on the dashboard so a silent gap mid-trip is detectable as a safety concern.
+    private val tripId = UUID.randomUUID().toString()
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            firestoreReporter.heartbeat()
+            heartbeatHandler.postDelayed(this, HEARTBEAT_MS)
+        }
+    }
+    private val appLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) { firestoreReporter.setAppState("FOREGROUND") }
+        override fun onStop(owner: LifecycleOwner)  { firestoreReporter.setAppState("BACKGROUND") }
+    }
 
     // ------------------------------------------------------------------
     // Lifecycle
@@ -114,6 +134,10 @@ class DetectionService : LifecycleService() {
         }
 
         setupThermalMonitor()
+
+        // Track whether the app is in the foreground so the dashboard can tell a graceful
+        // background from a rider going dark mid-trip.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -124,6 +148,11 @@ class DetectionService : LifecycleService() {
 
         startCamera()
         startLocationUpdates()
+
+        // Begin the trip + heartbeat (F2)
+        firestoreReporter.startTrip(tripId)
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_MS)
 
         Prefs.setDetectionRunning(this, true)
         return START_STICKY
@@ -140,6 +169,11 @@ class DetectionService : LifecycleService() {
         overlayManager.hide()
 
         try { locationClient.removeLocationUpdates(locationCallback) } catch (_: Exception) {}
+
+        // Graceful trip end — marks appState=ENDED so the dashboard does NOT flag a concern
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        try { ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver) } catch (_: Exception) {}
+        firestoreReporter.endTrip()
         firestoreReporter.flush()
 
         Prefs.setDetectionRunning(this, false)

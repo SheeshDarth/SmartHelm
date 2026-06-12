@@ -70,6 +70,8 @@ dependencies {
 
     // LifecycleService — Service that IS a LifecycleOwner (needed for CameraX)
     implementation("androidx.lifecycle:lifecycle-service:2.8.3")
+    // ProcessLifecycleOwner — app foreground/background for trip-safety (F2)
+    implementation("androidx.lifecycle:lifecycle-process:2.8.3")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))

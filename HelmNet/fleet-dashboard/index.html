@@ -270,6 +270,16 @@ header{
   font-family:var(--mono);
 }
 
+/* Safety concern banner (F2) */
+#safety-banner{display:none;align-items:center;gap:12px;background:#2a1a00;
+  border-bottom:2px solid #ffb300;color:#ffd479;padding:8px 20px;
+  font-size:.72rem;font-weight:700;letter-spacing:.03em;flex-shrink:0;
+  animation:sbpulse 1.6s ease-in-out infinite}
+#safety-banner.active{display:flex}
+#safety-banner .sb-icon{font-size:1rem;color:#ffb300}
+#safety-banner .sb-list{font-weight:600;color:#ffe9b8;font-family:var(--mono);font-size:.66rem}
+@keyframes sbpulse{0%,100%{border-bottom-color:#ffb300}50%{border-bottom-color:#7a5200}}
+
 /* Fleet map (Leaflet) */
 #fleet-map{width:100%;height:220px;background:#080f1c;border-radius:6px;z-index:0}
 .leaflet-container{background:#080f1c;font-family:var(--sans)}
@@ -408,6 +418,9 @@ footer{
     <div class="sbox-lbl">Fleet Risk Score</div>
   </div>
 </div>
+
+<!-- ══════════ SAFETY CONCERN BANNER (F2) ══════════ -->
+<div id="safety-banner"></div>
 
 <!-- ══════════ MAIN ══════════ -->
 <div class="main">
@@ -1279,9 +1292,10 @@ function updateFleetStats() {
   fleetRisk = clamp((riskSum / RIDERS.length) * 100, 0, 100);
   const today = RIDERS.reduce((a, r) => a + r.totalAlertsToday, 0);
 
+  document.getElementById("sb-active").textContent = n + w + c + e;
   document.getElementById("sb-normal").textContent = n;
   document.getElementById("sb-warn").textContent   = w;
-  document.getElementById("sb-crit").textContent   = c;
+  document.getElementById("sb-crit").textContent   = c + e;
   document.getElementById("sb-ear").textContent    = avgEAR.toFixed(3);
   document.getElementById("sb-alerts").textContent = today;
   const riskEl = document.getElementById("sb-risk");
@@ -1579,7 +1593,13 @@ function injectLiveData(deviceId, data) {
   }
 
   const stale = !data.connected || (Date.now()/1000 - (data.updatedAt?.seconds||0)) > 30;
-  if (stale) { releaseSlot(deviceId); return; }
+  if (stale) {
+    // Keep the slot if the rider is mid-trip — monitorSafety() escalates to a concern
+    if (data.tripActive === true && data.appState !== 'ENDED' && data.connected !== false) return;
+    releaseSlot(deviceId); return;
+  }
+  // Fresh data — rider is alive; clear any prior safety concern
+  clearConcern(deviceId);
 
   const slot = getOrAssignSlot(deviceId, data.riderName);
   if (slot < 0) return;
@@ -1651,25 +1671,122 @@ function injectLiveData(deviceId, data) {
 }
 
 // ── Firestore listener ───────────────────────────────────────────────
-function startListening() {
-  if (Notification.permission === 'default') Notification.requestPermission();
-  onSnapshot(collection(db, 'riders'), snap => {
-    snap.docChanges().forEach(ch => {
-      const id = ch.doc.id;
-      if (ch.type === 'removed') { delete liveData[id]; releaseSlot(id); delete prevAlert[id]; return; }
-      liveData[id] = ch.doc.data();
-    });
-    Object.entries(liveData).forEach(([id, data]) => {
-      injectLiveData(id, data);
-      if (!prevAlert[id] && data.alertActive && Notification.permission === 'granted') {
-        new Notification('SmartHelm — Drowsiness Alert', {
-          body: `${data.riderName || 'A rider'} — PERCLOS ${parseFloat(data.perclos||0).toFixed(0)}%`,
-          tag: 'sh-alert-' + id,
-        });
-      }
-      prevAlert[id] = data.alertActive;
-    });
+// ── F2: app-off-mid-trip safety concern ──────────────────────────────
+const CONCERN_SEC = 90;     // app silent this long mid-trip → safety concern
+const ABANDON_SEC = 1800;   // after 30 min, stop tracking as an active concern
+const concernState = {};    // deviceId → true while a concern is active
+
+// Seconds since the rider last checked in, but ONLY if they are mid-trip and
+// did not end gracefully. Returns -1 when there is no concern to evaluate.
+function midTripSilentAge(data) {
+  if (!data) return -1;
+  if (data.connected === false) return -1;   // graceful disconnect
+  if (data.appState === 'ENDED') return -1;   // trip ended cleanly
+  if (data.tripActive !== true) return -1;    // not on a trip
+  const last = (data.lastHeartbeatAt && data.lastHeartbeatAt.seconds)
+            || (data.updatedAt && data.updatedAt.seconds) || 0;
+  return Math.floor(Date.now() / 1000 - last);
+}
+
+function startSafetyMonitor() {
+  if (window._safetyMonitor) return;
+  window._safetyMonitor = setInterval(monitorSafety, 5000);
+}
+
+function monitorSafety() {
+  Object.entries(liveData).forEach(([id, data]) => {
+    if (managerCode && data.managerId && data.managerId !== managerCode) return;
+    const age = midTripSilentAge(data);
+    if (age >= CONCERN_SEC && age < ABANDON_SEC) {
+      raiseConcern(id, data, age);
+    } else {
+      if (concernState[id]) clearConcern(id);
+      if (age >= ABANDON_SEC) releaseSlot(id);
+    }
   });
+  renderConcernBanner();
+}
+
+function raiseConcern(id, data, age) {
+  const slot = getOrAssignSlot(id, data.riderName);
+  if (slot < 0) return;
+  const r = window._RIDERS[slot];
+  r._concern = true;
+  r.name = data.riderName || r.name;
+  if (data.location && typeof data.location.latitude === 'number') {
+    r.lat = data.location.latitude; r.lng = data.location.longitude;
+  }
+  if (!concernState[id]) {              // edge: raise once
+    concernState[id] = true;
+    if (Notification.permission === 'granted') {
+      new Notification('SmartHelm — Safety Concern', {
+        body: `${data.riderName || 'A rider'}'s app went offline mid-trip (silent ${age}s). Last known location pinned.`,
+        tag: 'sh-concern-' + id
+      });
+    }
+    if (window._pushIncident) {
+      window._pushIncident(r, 3, 'Safety Concern — App Offline Mid-Trip',
+        `Silent ${age}s · last GPS known`);
+    }
+  }
+}
+
+function clearConcern(id) {
+  if (!concernState[id]) return;
+  delete concernState[id];
+  const slot = deviceToSlot[id];
+  if (slot !== undefined && window._RIDERS[slot]) window._RIDERS[slot]._concern = false;
+  renderConcernBanner();
+}
+
+function renderConcernBanner() {
+  const el = document.getElementById('safety-banner');
+  if (!el) return;
+  const ids = Object.keys(concernState);
+  if (!ids.length) { el.className = ''; el.innerHTML = ''; return; }
+  const items = ids.map(id => {
+    const data = liveData[id];
+    const age = midTripSilentAge(data);
+    const name = (data && data.riderName) || 'Rider';
+    const loc = (data && data.location)
+      ? `${data.location.latitude.toFixed(4)}, ${data.location.longitude.toFixed(4)}` : 'unknown';
+    return `${name} — silent ${age >= 0 ? age + 's' : '—'} · last GPS ${loc}`;
+  });
+  el.className = 'active';
+  el.innerHTML = '<span class="sb-icon">⚠</span>' +
+    '<span>SAFETY CONCERN — rider app went dark mid-trip:</span>' +
+    '<span class="sb-list">' + items.join('  ·  ') + '</span>';
+}
+
+// ── Firestore listener ───────────────────────────────────────────────
+function startListening() {
+  startSafetyMonitor();
+  if (Notification.permission === 'default') Notification.requestPermission();
+  onSnapshot(collection(db, 'riders'),
+    snap => {
+      snap.docChanges().forEach(ch => {
+        const id = ch.doc.id;
+        if (ch.type === 'removed') { delete liveData[id]; releaseSlot(id); delete prevAlert[id]; return; }
+        liveData[id] = ch.doc.data();
+      });
+      Object.entries(liveData).forEach(([id, data]) => {
+        try { injectLiveData(id, data); }
+        catch (e) { console.error('SmartHelm injectLiveData failed for', id, e); return; }
+        if (!prevAlert[id] && data.alertActive && Notification.permission === 'granted') {
+          new Notification('SmartHelm — Drowsiness Alert', {
+            body: `${data.riderName || 'A rider'} — PERCLOS ${parseFloat(data.perclos||0).toFixed(0)}%`,
+            tag: 'sh-alert-' + id,
+          });
+        }
+        prevAlert[id] = data.alertActive;
+      });
+    },
+    err => {
+      // Surface listener failures (e.g. permission-denied from Firestore rules,
+      // or Anonymous Auth disabled) instead of failing silently.
+      console.error('SmartHelm Firestore listener error:', err.code, err.message);
+    }
+  );
 }
 
 signInAnonymously(auth)
