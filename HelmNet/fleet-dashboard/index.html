@@ -351,6 +351,9 @@ footer{
 <!-- Leaflet — real map tiles for live driver positions (F1) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Firebase config — gitignored, loaded as plain script so it works in all browsers
+     including Firefox (which blocks file:// ES module imports). Sets window._firebaseConfig. -->
+<script src="./firebase.config.js"></script>
 </head>
 <body>
 
@@ -1510,17 +1513,10 @@ import { getFirestore, collection, onSnapshot }
 import { getAuth, signInAnonymously }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-// Inlined — firebase.config.js local import fails silently when the module
-// can't resolve the relative path, killing the entire script block.
-// Firebase web API keys are public by design; security is enforced by Firestore rules.
-const firebaseConfig = {
-    apiKey:            "AIzaSyDZbUGHuhLOOEMJth1MxqG-pt8ySgbbieY",
-    authDomain:        "smarthelm-99225.firebaseapp.com",
-    projectId:         "smarthelm-99225",
-    storageBucket:     "smarthelm-99225.firebasestorage.app",
-    messagingSenderId: "981662991345",
-    appId:             "1:981662991345:web:d0e8e3044315980d037a50"
-};
+// firebase.config.js is loaded as a plain <script> above and sets window._firebaseConfig.
+// Using a plain script (not an ES module import) works in all browsers including Firefox,
+// which blocks file:// relative ES module imports.
+const firebaseConfig = window._firebaseConfig;
 
 const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
