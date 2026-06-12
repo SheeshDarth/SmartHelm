@@ -7,6 +7,7 @@ import android.media.SoundPool
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Base64
 import android.util.Log
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.smarthelm.mobile.BuildConfig
@@ -17,19 +18,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /**
- * Manages all alert output: audio beep burst, vibration, and SMS via MSG91.
+ * Manages all alert output: audio beep burst, vibration, and SMS via Twilio.
  *
  * SMS path:
- *   trigger() → sendViaMSG91() → MSG91 transactional route 4
- *   Route 4 bypasses DND registration — delivered even to DND numbers.
+ *   trigger() → sendViaTwilio() → Twilio Programmable SMS REST API
+ *   Sends to emergency contact + fleet manager phone when drowsiness is confirmed.
  *
- * Auth key + sender ID come from BuildConfig, injected at build time
+ * Credentials come from BuildConfig, injected at build time
  * from local.properties (never committed to source control).
  */
 class AlertManager(private val context: Context) {
@@ -40,7 +40,6 @@ class AlertManager(private val context: Context) {
         private const val SMS_COOLDOWN_MS  = 5 * 60 * 1_000L
         private const val BEEP_COUNT       = 4
         private const val BEEP_GAP_MS      = 50L
-        private const val MSG91_URL        = "https://control.msg91.com/api/v5/sms"
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -88,7 +87,7 @@ class AlertManager(private val context: Context) {
             scope.launch { playBeepsAndVibrate() }
         }
 
-        // ── SMS via MSG91 ─────────────────────────────────────────────
+        // ── SMS via Twilio ────────────────────────────────────────────
         if ((now - lastSmsMs) >= SMS_COOLDOWN_MS) {
             val emergency = Prefs.getEmergencyContact(context).trim()
             val fleetMgr  = Prefs.getFleetManagerPhone(context).trim()
@@ -101,7 +100,7 @@ class AlertManager(private val context: Context) {
             } else {
                 lastSmsMs = now
                 val riderName = Prefs.getRiderName(context).ifBlank { "the rider" }
-                scope.launch { sendViaMSG91(recipients.toList(), riderName) }
+                scope.launch { sendViaTwilio(recipients.toList(), riderName) }
             }
         }
     }
@@ -116,61 +115,58 @@ class AlertManager(private val context: Context) {
     }
 
     // ------------------------------------------------------------------
-    // MSG91 transactional SMS
+    // Twilio Programmable SMS
     // ------------------------------------------------------------------
 
-    private fun sendViaMSG91(numbers: List<String>, riderName: String) {
-        if (BuildConfig.MSG91_AUTH_KEY.isBlank()) {
-            Log.w(TAG, "MSG91_AUTH_KEY not set — SMS skipped")
+    private fun sendViaTwilio(numbers: List<String>, riderName: String) {
+        val sid   = BuildConfig.TWILIO_ACCOUNT_SID
+        val token = BuildConfig.TWILIO_AUTH_TOKEN
+        val from  = BuildConfig.TWILIO_FROM_NUMBER
+        if (sid.isBlank() || token.isBlank() || from.isBlank()) {
+            Log.w(TAG, "Twilio credentials not set — SMS skipped")
             return
         }
 
-        // Normalise: strip leading + so MSG91 receives e.g. 919876543210.
-        // Do NOT send the "country" field — if numbers already carry the country code
-        // (91xxxxxxxxxx), MSG91 would prepend 91 a second time and the delivery fails.
-        val mobiles = numbers.map { it.trimStart('+') }
+        val message = "SmartHelm Alert: $riderName is showing signs of drowsiness or fatigue. " +
+                      "Please check in immediately."
+        val url     = "https://api.twilio.com/2010-04-01/Accounts/$sid/Messages.json"
+        val creds   = Base64.encodeToString(
+            "$sid:$token".toByteArray(Charsets.UTF_8), Base64.NO_WRAP
+        )
 
-        val payload = JSONObject().apply {
-            put("sender", BuildConfig.MSG91_SENDER_ID)
-            put("route",  "4")   // transactional — bypasses DND
-            put("sms", JSONArray().put(
-                JSONObject().apply {
-                    put("message",
-                        "SmartHelm Alert: $riderName is showing signs of drowsiness or fatigue. " +
-                        "Please check in immediately.")
-                    put("to", JSONArray(mobiles))
+        for (phone in numbers) {
+            val to      = if (phone.startsWith("+")) phone else "+$phone"
+            val payload = "To=${URLEncoder.encode(to, "UTF-8")}" +
+                          "&From=${URLEncoder.encode(from, "UTF-8")}" +
+                          "&Body=${URLEncoder.encode(message, "UTF-8")}"
+
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    setRequestProperty("Authorization", "Basic $creds")
+                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                    connectTimeout = 10_000
+                    readTimeout    = 10_000
+                    doOutput       = true
                 }
-            ))
-        }.toString()
+                conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
 
-        var conn: HttpURLConnection? = null
-        try {
-            conn = (URL(MSG91_URL).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("authkey",      BuildConfig.MSG91_AUTH_KEY)
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("accept",       "application/json")
-                connectTimeout = 10_000
-                readTimeout    = 10_000
-                doOutput       = true
+                val code     = conn.responseCode
+                val response = (if (code < 400) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.readText() ?: ""
+
+                if (code in 200..299) {
+                    Log.i(TAG, "Twilio sent to $to → HTTP $code")
+                } else {
+                    Log.w(TAG, "Twilio failed: HTTP $code | body: $response | to: $to")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Twilio request failed to $to: ${e.message}")
+                FirebaseCrashlytics.getInstance().recordException(e)
+            } finally {
+                conn?.disconnect()
             }
-            conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-
-            val code     = conn.responseCode
-            val response = (if (code < 400) conn.inputStream else conn.errorStream)
-                ?.bufferedReader()?.readText() ?: ""
-
-            if (code in 200..299) {
-                Log.i(TAG, "MSG91 sent to ${mobiles.joinToString()} → $code | $response")
-            } else {
-                // Log full body — MSG91 includes the specific rejection reason here
-                Log.w(TAG, "MSG91 failed: HTTP $code | body: $response | numbers: ${mobiles.joinToString()}")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "MSG91 request failed: ${e.message}")
-            FirebaseCrashlytics.getInstance().recordException(e)
-        } finally {
-            conn?.disconnect()
         }
     }
 

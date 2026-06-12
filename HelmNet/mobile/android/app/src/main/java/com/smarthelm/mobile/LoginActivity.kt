@@ -2,38 +2,39 @@ package com.smarthelm.mobile
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Base64
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.PhoneAuthCredential
-import com.google.firebase.auth.PhoneAuthOptions
-import com.google.firebase.auth.PhoneAuthProvider
 import com.smarthelm.mobile.databinding.ActivityLoginBinding
 import com.smarthelm.mobile.util.Prefs
-import java.util.concurrent.TimeUnit
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 
 /**
- * Phone number sign-in via Firebase Phone Auth (OTP).
+ * Phone number sign-in via Twilio OTP + Firebase Anonymous Auth.
  *
  * Flow:
  *   1. Enter phone number with country code (+91...)
- *   2. "Send OTP" → Firebase sends SMS
- *   3. Enter 6-digit code → verified → proceed to SetupActivity or MainActivity
+ *   2. "Send OTP" → Twilio sends a 6-digit code via SMS
+ *   3. Enter 6-digit code → verified locally → Firebase Anonymous session created
+ *   4. Proceed to SetupActivity or MainActivity
  *
- * Firebase setup required (one-time, in Firebase Console):
- *   - Authentication → Sign-in methods → Phone → Enable
- *   - Project settings → Android app → Add debug SHA-1 fingerprint
- *     (run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android)
+ * Trial account note: Twilio free trial can only send to numbers verified in the
+ * Twilio console (twilio.com → Verified Caller IDs). Add the rider's number there
+ * before the first login demo.
  */
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
 
-    private var verificationId: String? = null
-    private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
+    private var pendingOtp: String? = null
+    private var otpExpiresAt: Long  = 0L
+    private var pendingPhone: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +66,8 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         clearError()
-        sendOtp(phone)
+        pendingPhone = phone
+        sendOtpViaTwilio(phone)
     }
 
     private fun onVerifyClicked() {
@@ -74,80 +76,103 @@ class LoginActivity : AppCompatActivity() {
             showError("Enter the complete 6-digit code")
             return
         }
-        val id = verificationId
-        if (id == null) {
-            showError("Session expired — tap 'Resend OTP'")
+        if (System.currentTimeMillis() > otpExpiresAt) {
+            showError("OTP expired — tap Resend")
+            return
+        }
+        if (code != pendingOtp) {
+            showError("Incorrect code — try again")
             return
         }
         clearError()
         setLoading(true)
-        signInWithCredential(PhoneAuthProvider.getCredential(id, code))
+        // OTP verified — create a Firebase Anonymous session for Firestore access
+        auth.signInAnonymously()
+            .addOnSuccessListener {
+                Prefs.setRiderPhone(this, pendingPhone)
+                setLoading(false)
+                proceed()
+            }
+            .addOnFailureListener { e ->
+                setLoading(false)
+                showError("Session error: ${e.message}")
+            }
     }
 
     private fun onResendClicked() {
-        // Go back to phone input so user can edit or resend
         binding.layoutOtp.visibility   = View.GONE
         binding.layoutPhone.visibility = View.VISIBLE
         clearError()
         val phone = binding.etPhone.text?.toString()?.trim() ?: ""
         if (phone.isNotBlank()) {
-            sendOtp(phone, resendToken)
+            pendingPhone = phone
+            sendOtpViaTwilio(phone)
         }
     }
 
     // ------------------------------------------------------------------
-    // OTP send / verify
+    // OTP send via Twilio
     // ------------------------------------------------------------------
 
-    private fun sendOtp(phone: String, token: PhoneAuthProvider.ForceResendingToken? = null) {
-        setLoading(true)
-        val builder = PhoneAuthOptions.newBuilder(auth)
-            .setPhoneNumber(phone)
-            .setTimeout(60L, TimeUnit.SECONDS)
-            .setActivity(this)
-            .setCallbacks(verificationCallbacks)
-        if (token != null) builder.setForceResendingToken(token)
-        PhoneAuthProvider.verifyPhoneNumber(builder.build())
-    }
-
-    private val verificationCallbacks =
-        object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-
-            /** Instant verification (rare on real devices) — skip OTP screen. */
-            override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                signInWithCredential(credential)
-            }
-
-            override fun onVerificationFailed(e: FirebaseException) {
-                setLoading(false)
-                showError("Failed to send OTP: ${e.message}")
-            }
-
-            override fun onCodeSent(
-                verId: String,
-                token: PhoneAuthProvider.ForceResendingToken
-            ) {
-                verificationId = verId
-                resendToken    = token
-                setLoading(false)
-                showOtpSection()
-                Toast.makeText(this@LoginActivity, "OTP sent ✓", Toast.LENGTH_SHORT).show()
-            }
+    private fun sendOtpViaTwilio(phone: String) {
+        val sid   = BuildConfig.TWILIO_ACCOUNT_SID
+        val token = BuildConfig.TWILIO_AUTH_TOKEN
+        val from  = BuildConfig.TWILIO_FROM_NUMBER
+        if (sid.isBlank()) {
+            showError("SMS not configured — contact support")
+            return
         }
 
-    private fun signInWithCredential(credential: PhoneAuthCredential) {
+        val otp  = (100_000..999_999).random().toString()
+        val body = "Your SmartHelm OTP is: $otp. Valid for 10 minutes."
+        val to   = if (phone.startsWith("+")) phone else "+$phone"
+
+        pendingOtp   = otp
+        otpExpiresAt = System.currentTimeMillis() + 10 * 60 * 1_000L
+
         setLoading(true)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener(this) { task ->
+        Thread {
+            val success = postTwilioSms(sid, token, from, to, body)
+            runOnUiThread {
                 setLoading(false)
-                if (task.isSuccessful) {
-                    // Persist phone number locally for profile display
-                    Prefs.setRiderPhone(this, auth.currentUser?.phoneNumber ?: "")
-                    proceed()
+                if (success) {
+                    showOtpSection()
+                    Toast.makeText(this, "OTP sent ✓", Toast.LENGTH_SHORT).show()
                 } else {
-                    showError("Verification failed: ${task.exception?.message}")
+                    showError("Failed to send OTP. Make sure your number is verified in Twilio console.")
+                    pendingOtp = null
                 }
             }
+        }.start()
+    }
+
+    private fun postTwilioSms(
+        sid: String, token: String, from: String, to: String, body: String
+    ): Boolean {
+        val url     = "https://api.twilio.com/2010-04-01/Accounts/$sid/Messages.json"
+        val creds   = Base64.encodeToString(
+            "$sid:$token".toByteArray(Charsets.UTF_8), Base64.NO_WRAP
+        )
+        val payload = "To=${URLEncoder.encode(to, "UTF-8")}" +
+                      "&From=${URLEncoder.encode(from, "UTF-8")}" +
+                      "&Body=${URLEncoder.encode(body, "UTF-8")}"
+        return try {
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Authorization", "Basic $creds")
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connectTimeout = 10_000
+                readTimeout    = 10_000
+                doOutput       = true
+            }
+            conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 200..299
+        } catch (e: Exception) {
+            Log.w(TAG, "Twilio OTP failed: ${e.message}")
+            false
+        }
     }
 
     // ------------------------------------------------------------------
@@ -155,12 +180,10 @@ class LoginActivity : AppCompatActivity() {
     // ------------------------------------------------------------------
 
     private fun proceed() {
-        val next = if (!Prefs.isSetupComplete(this)) {
-            Intent(this, SetupActivity::class.java)
-        } else {
-            Intent(this, MainActivity::class.java)
-        }
-        startActivity(next)
+        startActivity(
+            if (!Prefs.isSetupComplete(this)) Intent(this, SetupActivity::class.java)
+            else Intent(this, MainActivity::class.java)
+        )
         finish()
     }
 
@@ -171,8 +194,7 @@ class LoginActivity : AppCompatActivity() {
     private fun showOtpSection() {
         binding.layoutPhone.visibility = View.GONE
         binding.layoutOtp.visibility   = View.VISIBLE
-        val phone = binding.etPhone.text?.toString() ?: ""
-        binding.tvOtpHint.text = "Code sent to $phone — check your messages"
+        binding.tvOtpHint.text = "Code sent to $pendingPhone — check your messages"
         binding.etOtp.requestFocus()
     }
 
@@ -188,7 +210,9 @@ class LoginActivity : AppCompatActivity() {
         binding.tvError.visibility = View.VISIBLE
     }
 
-    private fun clearError() {
-        binding.tvError.visibility = View.GONE
+    private fun clearError() { binding.tvError.visibility = View.GONE }
+
+    companion object {
+        private const val TAG = "LoginActivity"
     }
 }

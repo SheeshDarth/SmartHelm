@@ -7,7 +7,7 @@ plugins {
     id("com.google.firebase.crashlytics")
 }
 
-// Read MSG91 credentials from local.properties (never committed to git)
+// Read credentials from local.properties (never committed to git)
 val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) load(f.inputStream())
@@ -24,10 +24,12 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "MSG91_AUTH_KEY",
-            "\"${localProps.getProperty("MSG91_AUTH_KEY", "")}\"")
-        buildConfigField("String", "MSG91_SENDER_ID",
-            "\"${localProps.getProperty("MSG91_SENDER_ID", "SMHELM")}\"")
+        buildConfigField("String", "TWILIO_ACCOUNT_SID",
+            "\"${localProps.getProperty("TWILIO_ACCOUNT_SID", "")}\"")
+        buildConfigField("String", "TWILIO_AUTH_TOKEN",
+            "\"${localProps.getProperty("TWILIO_AUTH_TOKEN", "")}\"")
+        buildConfigField("String", "TWILIO_FROM_NUMBER",
+            "\"${localProps.getProperty("TWILIO_FROM_NUMBER", "")}\"")
     }
 
     buildTypes {
