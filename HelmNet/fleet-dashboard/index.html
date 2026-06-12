@@ -368,6 +368,10 @@ footer{
     AI Drowsiness Detection · Phase 2 Demo · Bangalore Delivery Fleet
   </div>
   <div class="header-right">
+    <div id="fb-pill" class="live-pill" style="background:rgba(255,165,0,.08);border-color:rgba(255,165,0,.3);color:var(--amber)">
+      <span id="fb-dot" class="live-dot" style="background:var(--amber)"></span>
+      <span id="fb-label">CONNECTING</span>
+    </div>
     <div class="live-pill"><span class="live-dot"></span>LIVE</div>
     <span class="hdr-time" id="hdr-time">--:--:--</span>
     <button class="export-btn" onclick="exportReport()">
@@ -383,7 +387,7 @@ footer{
     style="background:#252525;border:1px solid #3a3a3a;color:var(--text);padding:4px 10px;border-radius:5px;font-size:.68rem;width:240px;outline:none;font-family:var(--mono)">
   <button onclick="window._setManagerCode()"
     style="background:var(--green);color:#000;border:none;padding:4px 14px;border-radius:5px;font-size:.68rem;font-weight:800;cursor:pointer;letter-spacing:.04em">CONNECT</button>
-  <span id="mgr-status" style="color:var(--dim);font-size:.65rem"></span>
+  <span id="mgr-status" style="color:var(--dim);font-size:.65rem">Showing all riders</span>
   <span id="mgr-code-box" style="display:none;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);border-radius:5px;padding:3px 10px;font-family:var(--mono);font-size:.75rem;font-weight:800;color:#00e5ff;letter-spacing:.1em"></span>
   <span id="mgr-code-hint" style="display:none;color:var(--dim);font-size:.6rem">← share this code with your riders (they enter your phone in setup)</span>
   <button id="mgr-clear" onclick="window._clearManagerCode()" style="display:none;background:transparent;border:1px solid #3a3a3a;color:var(--mid);padding:3px 10px;border-radius:5px;font-size:.62rem;cursor:pointer">✕ Clear</button>
@@ -1730,7 +1734,7 @@ function startSafetyMonitor() {
 
 function monitorSafety() {
   Object.entries(liveData).forEach(([id, data]) => {
-    if (managerCode && data.managerId && data.managerId !== managerCode) return;
+    if (managerCode && data.managerId !== managerCode) return;
     const age = midTripSilentAge(data);
     if (age >= CONCERN_SEC && age < ABANDON_SEC) {
       raiseConcern(id, data, age);
@@ -1793,6 +1797,20 @@ function renderConcernBanner() {
     '<span class="sb-list">' + items.join('  ·  ') + '</span>';
 }
 
+// ── Firebase connection status pill ─────────────────────────────────
+function setFbStatus(ok, label) {
+  const pill = document.getElementById('fb-pill');
+  const dot  = document.getElementById('fb-dot');
+  const lbl  = document.getElementById('fb-label');
+  if (!pill) return;
+  const [bg, bc, tc, dc] = ok
+    ? ['rgba(34,204,68,.08)','rgba(34,204,68,.3)','var(--green)','var(--green)']
+    : ['rgba(255,68,68,.08)','rgba(255,68,68,.3)','var(--red)',  'var(--red)'];
+  Object.assign(pill.style, { background: bg, borderColor: bc, color: tc });
+  dot.style.background = dc;
+  lbl.textContent = label;
+}
+
 // ── Firestore listener ───────────────────────────────────────────────
 function startListening() {
   startSafetyMonitor();
@@ -1817,16 +1835,19 @@ function startListening() {
       });
     },
     err => {
-      // Surface listener failures (e.g. permission-denied from Firestore rules,
-      // or Anonymous Auth disabled) instead of failing silently.
       console.error('SmartHelm Firestore listener error:', err.code, err.message);
+      setFbStatus(false, err.code === 'permission-denied' ? 'AUTH ERR' : 'FS ERR');
     }
   );
 }
 
 signInAnonymously(auth)
-  .then(() => startListening())
-  .catch(err => { console.warn('SmartHelm Firebase auth:', err.message); startListening(); });
+  .then(() => { setFbStatus(true, 'FIREBASE'); startListening(); })
+  .catch(err => {
+    console.warn('SmartHelm Firebase auth:', err.message);
+    setFbStatus(false, 'AUTH ERR');
+    startListening();
+  });
 </script>
 </body>
 </html>

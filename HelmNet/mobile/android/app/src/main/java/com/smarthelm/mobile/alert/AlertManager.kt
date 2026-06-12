@@ -35,11 +35,12 @@ import java.net.URLEncoder
 class AlertManager(private val context: Context) {
 
     companion object {
-        private const val TAG              = "AlertManager"
-        private const val BEEP_COOLDOWN_MS = 1_500L
-        private const val SMS_COOLDOWN_MS  = 5 * 60 * 1_000L
-        private const val BEEP_COUNT       = 4
-        private const val BEEP_GAP_MS      = 50L
+        private const val TAG                  = "AlertManager"
+        private const val BEEP_COOLDOWN_MS     = 1_500L
+        private const val SMS_INITIAL_DELAY_MS = 15_000L          // 15 s of sustained alert before first SMS
+        private const val SMS_COOLDOWN_MS      = 5 * 60 * 1_000L // then at most once every 5 min
+        private const val BEEP_COUNT           = 4
+        private const val BEEP_GAP_MS          = 50L
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -47,6 +48,7 @@ class AlertManager(private val context: Context) {
     @Volatile private var alertActive  = false
     @Volatile private var lastBeepMs   = 0L
     @Volatile private var lastSmsMs    = 0L
+    @Volatile private var alertStartMs = 0L   // when the current alert episode began
     @Volatile private var beepInFlight = false
 
     private val soundPool: SoundPool
@@ -88,7 +90,12 @@ class AlertManager(private val context: Context) {
         }
 
         // ── SMS via Twilio ────────────────────────────────────────────
-        if ((now - lastSmsMs) >= SMS_COOLDOWN_MS) {
+        // Track when this alert episode began so we can apply the initial delay.
+        if (alertStartMs == 0L) alertStartMs = now
+        val sinceStart = now - alertStartMs
+        val sinceLast  = now - lastSmsMs
+        // First SMS fires after 15 s of sustained alerting; repeats at most every 5 min.
+        if (sinceStart >= SMS_INITIAL_DELAY_MS && (lastSmsMs == 0L || sinceLast >= SMS_COOLDOWN_MS)) {
             val emergency = Prefs.getEmergencyContact(context).trim()
             val fleetMgr  = Prefs.getFleetManagerPhone(context).trim()
             val recipients = buildSet {
@@ -105,7 +112,10 @@ class AlertManager(private val context: Context) {
         }
     }
 
-    fun clear() { alertActive = false }
+    fun clear() {
+        alertActive  = false
+        alertStartMs = 0L   // reset so the next episode gets a fresh 15-second window
+    }
 
     fun isActive() = alertActive
 
