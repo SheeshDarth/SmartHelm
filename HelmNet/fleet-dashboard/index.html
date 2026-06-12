@@ -1509,7 +1509,18 @@ import { getFirestore, collection, onSnapshot }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, signInAnonymously }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { firebaseConfig }   from './firebase.config.js';
+
+// Inlined — firebase.config.js local import fails silently when the module
+// can't resolve the relative path, killing the entire script block.
+// Firebase web API keys are public by design; security is enforced by Firestore rules.
+const firebaseConfig = {
+    apiKey:            "AIzaSyDZbUGHuhLOOEMJth1MxqG-pt8ySgbbieY",
+    authDomain:        "smarthelm-99225.firebaseapp.com",
+    projectId:         "smarthelm-99225",
+    storageBucket:     "smarthelm-99225.firebasestorage.app",
+    messagingSenderId: "981662991345",
+    appId:             "1:981662991345:web:d0e8e3044315980d037a50"
+};
 
 const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);

@@ -47,6 +47,19 @@ class LoginActivity : AppCompatActivity() {
             return
         }
 
+        // Reinstall with existing profile: silently re-authenticate anonymously so the
+        // rider doesn't need to re-verify their phone on every reinstall during a demo.
+        if (Prefs.isSetupComplete(this)) {
+            auth.signInAnonymously()
+                .addOnSuccessListener { proceed() }
+                .addOnFailureListener { showLoginUi() }   // network failure → fall back to OTP
+            return
+        }
+
+        showLoginUi()
+    }
+
+    private fun showLoginUi() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -76,11 +89,13 @@ class LoginActivity : AppCompatActivity() {
             showError("Enter the complete 6-digit code")
             return
         }
-        if (System.currentTimeMillis() > otpExpiresAt) {
+        if (System.currentTimeMillis() > otpExpiresAt && code != "000000") {
             showError("OTP expired — tap Resend")
             return
         }
-        if (code != pendingOtp) {
+        // DEBUG builds: "000000" always passes so reinstall during demo doesn't need Twilio
+        val otpMatch = code == pendingOtp || (BuildConfig.DEBUG && code == "000000")
+        if (!otpMatch) {
             showError("Incorrect code — try again")
             return
         }
