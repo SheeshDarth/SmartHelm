@@ -125,17 +125,18 @@ class AlertManager(private val context: Context) {
             return
         }
 
-        // MSG91 expects numbers without leading + (e.g. 919876543210)
+        // Normalise: strip leading + so MSG91 receives e.g. 919876543210.
+        // Do NOT send the "country" field — if numbers already carry the country code
+        // (91xxxxxxxxxx), MSG91 would prepend 91 a second time and the delivery fails.
         val mobiles = numbers.map { it.trimStart('+') }
 
         val payload = JSONObject().apply {
-            put("sender",  BuildConfig.MSG91_SENDER_ID)
-            put("route",   "4")       // transactional — bypasses DND
-            put("country", "91")
+            put("sender", BuildConfig.MSG91_SENDER_ID)
+            put("route",  "4")   // transactional — bypasses DND
             put("sms", JSONArray().put(
                 JSONObject().apply {
                     put("message",
-                        "SmartHelm Alert: $riderName is showing signs of drowsiness. " +
+                        "SmartHelm Alert: $riderName is showing signs of drowsiness or fatigue. " +
                         "Please check in immediately.")
                     put("to", JSONArray(mobiles))
                 }
@@ -160,9 +161,10 @@ class AlertManager(private val context: Context) {
                 ?.bufferedReader()?.readText() ?: ""
 
             if (code in 200..299) {
-                Log.i(TAG, "MSG91 SMS sent to ${mobiles.joinToString()} — response: $response")
+                Log.i(TAG, "MSG91 sent to ${mobiles.joinToString()} → $code | $response")
             } else {
-                Log.w(TAG, "MSG91 error $code: $response")
+                // Log full body — MSG91 includes the specific rejection reason here
+                Log.w(TAG, "MSG91 failed: HTTP $code | body: $response | numbers: ${mobiles.joinToString()}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "MSG91 request failed: ${e.message}")

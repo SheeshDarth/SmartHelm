@@ -69,6 +69,18 @@ class DetectionService : LifecycleService() {
         private const val NOTIF_ID  = 1001
         private const val TAG       = "DetectionService"
         private const val HEARTBEAT_MS = 15_000L   // F2 liveness ping cadence
+
+        // DJB2-derived 6-char alphanumeric code from a phone number.
+        // Same algorithm is mirrored in the fleet dashboard JS so both sides always agree.
+        fun managerCodeFromPhone(phone: String): String {
+            val digits = phone.filter { it.isDigit() }
+            if (digits.isEmpty()) return "XXXXXX"
+            var h = 5381L
+            for (c in digits) h = ((h * 33L) xor c.code.toLong()) and 0xFFFFFFFFL
+            val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+            var x = h
+            return buildString(6) { repeat(6) { append(chars[(x % chars.length).toInt()]); x /= chars.length } }
+        }
     }
 
     private lateinit var eyeDetector:    EyeDetector
@@ -121,7 +133,10 @@ class DetectionService : LifecycleService() {
         val deviceId         = Prefs.getDeviceId(this)
         val riderName        = Prefs.getRiderName(this)
         val emergencyContact = Prefs.getEmergencyContact(this)
-        val managerId        = Prefs.getFleetManagerPhone(this)
+        val managerPhone     = Prefs.getFleetManagerPhone(this)
+        // Derive a stable 6-char manager code from the phone number so the fleet dashboard
+        // can filter by it without ever comparing raw phone strings.
+        val managerId        = if (managerPhone.isBlank()) "" else managerCodeFromPhone(managerPhone)
         firestoreReporter = FirestoreReporter(
             FirebaseFirestore.getInstance(), deviceId, riderName, emergencyContact, managerId
         )

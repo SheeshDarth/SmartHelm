@@ -44,9 +44,11 @@ class FatigueScorer {
         private const val EXIT   = 38f
         private const val CAUTION = 40f
 
-        private const val CONFIRM_MS     = 700L     // score must hold above ENTER this long
-        private const val MICROSLEEP_SEC = 1.5f     // continuous closure that always alarms
-        private const val MIN_SPEED_KMPH = 5f       // below this = treated as stopped (speed-gated)
+        private const val CONFIRM_MS          = 700L   // score must hold above ENTER this long
+        private const val MICROSLEEP_SEC      = 1.5f   // continuous closure that always alarms
+        private const val MICROSLEEP_YAWN_SEC = 3.5f   // raised threshold when mouth is open (yawning)
+        private const val MAR_YAWN_THRESHOLD  = 0.55f  // MAR above this = mouth wide open (yawning)
+        private const val MIN_SPEED_KMPH = 5f          // below this = treated as stopped (speed-gated)
     }
 
     private val yawnTracker = YawnTracker()
@@ -79,7 +81,11 @@ class FatigueScorer {
         val score   = fused * 100f
 
         // ── Decision: hysteresis + confirmation + microsleep override ─────────
-        val microsleep = perc.continuousClosureSec >= MICROSLEEP_SEC
+        // During an active yawn (mouth wide open) the person naturally closes their eyes.
+        // Use an extended threshold so a big yawn (typically ≤ 3 s) never trips the alarm.
+        val isYawning  = det.faceDetected && det.mar >= MAR_YAWN_THRESHOLD
+        val microsleep = perc.continuousClosureSec >=
+                         (if (isYawning) MICROSLEEP_YAWN_SEC else MICROSLEEP_SEC)
         val enterCond  = score >= ENTER || microsleep
 
         if (enterCond) {
