@@ -1524,8 +1524,11 @@ const auth = getAuth(app);
 
 // ── Manager code derivation — mirrors DetectionService.managerCodeFromPhone() ──
 // DJB2 hash → 6 chars from base-32 (no 0/O/1/I/L) — same algorithm as Kotlin side.
+// Normalise to the LAST 10 DIGITS first, so +91 / 0-prefix / bare-10-digit forms
+// all collapse to one canonical number and always produce the same code.
 function managerCodeFromPhone(phone) {
-  const digits = phone.replace(/\D/g, '');
+  let digits = (phone || '').replace(/\D/g, '');
+  if (digits.length > 10) digits = digits.slice(-10);
   if (!digits) return 'XXXXXX';
   let h = 5381;
   for (let i = 0; i < digits.length; i++) {
@@ -1575,14 +1578,20 @@ window._clearManagerCode = () => {
   if (hint) hint.style.display = 'none';
   Object.entries(liveData).forEach(([id, data]) => injectLiveData(id, data));
 };
-// Restore saved state on load
-if (managerCode) {
+// Restore saved state on load. Recompute the code from the saved phone rather
+// than trusting the cached code, so any change to the hash/normalisation applies
+// automatically on refresh without needing to Clear + reconnect.
+{
   const savedPhone = localStorage.getItem('sh_manager_phone') || '';
-  document.getElementById('mgr-input').value = savedPhone;
-  document.getElementById('mgr-status').textContent = 'Connected ·';
-  document.getElementById('mgr-status').style.color = 'var(--green)';
-  _showManagerCode(managerCode);
-  document.getElementById('mgr-clear').style.display = '';
+  if (savedPhone) {
+    managerCode = managerCodeFromPhone(savedPhone);
+    localStorage.setItem('sh_manager_code', managerCode);
+    document.getElementById('mgr-input').value = savedPhone;
+    document.getElementById('mgr-status').textContent = 'Connected ·';
+    document.getElementById('mgr-status').style.color = 'var(--green)';
+    _showManagerCode(managerCode);
+    document.getElementById('mgr-clear').style.display = '';
+  }
 }
 
 // ── Slot management ──────────────────────────────────────────────────
@@ -1634,6 +1643,9 @@ function injectLiveData(deviceId, data) {
   // Fleet manager filter — when active, show ONLY riders whose managerId matches.
   // Riders without a managerId are also hidden (they haven't set up their manager).
   if (managerCode && data.managerId !== managerCode) {
+    console.warn(`[SmartHelm] Hiding "${data.riderName || deviceId}": ` +
+      `rider managerId="${data.managerId || '(empty)'}" ≠ dashboard code "${managerCode}". ` +
+      `Rider must enter the SAME manager phone in app setup.`);
     releaseSlot(deviceId);
     return;
   }

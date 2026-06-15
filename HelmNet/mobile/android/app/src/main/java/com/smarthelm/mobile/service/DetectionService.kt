@@ -72,8 +72,11 @@ class DetectionService : LifecycleService() {
 
         // DJB2-derived 6-char alphanumeric code from a phone number.
         // Same algorithm is mirrored in the fleet dashboard JS so both sides always agree.
+        // Normalise to the LAST 10 DIGITS first, so +91 / 0-prefix / bare-10-digit forms
+        // all collapse to one canonical number and always produce the same code.
         fun managerCodeFromPhone(phone: String): String {
-            val digits = phone.filter { it.isDigit() }
+            var digits = phone.filter { it.isDigit() }
+            if (digits.length > 10) digits = digits.takeLast(10)
             if (digits.isEmpty()) return "XXXXXX"
             var h = 5381L
             for (c in digits) h = ((h * 33L) xor c.code.toLong()) and 0xFFFFFFFFL
