@@ -14,16 +14,18 @@ import com.smarthelm.mobile.util.Prefs
 /**
  * First-time profile setup:
  *   - Rider name
- *   - Fleet manager phone (receives SMS on every alert)
- *   - Emergency contact phone (family/friend, also alerted)
+ *   - Fleet code (6-char, from the manager's dashboard)
  *
- * Re-openable from MainActivity settings so rider can update contacts.
- * Saves locally to Prefs AND pushes the profile document to Firestore
- * so the fleet dashboard shows correct contact info.
+ * The fleet code is looked up in /fleets/{code}; the manager phone and fleet
+ * emergency contact stored there are cached locally and used for alert SMS.
+ * The rider never types the manager's or emergency numbers directly.
+ *
+ * Re-openable from MainActivity settings so the rider can change fleets.
  */
 class SetupActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySetupBinding
+    private val db = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,8 +34,7 @@ class SetupActivity : AppCompatActivity() {
 
         // Pre-fill from stored values (for re-edits after initial setup)
         binding.etName.setText(Prefs.getRiderName(this))
-        binding.etFleetManager.setText(Prefs.getFleetManagerPhone(this))
-        binding.etEmergency.setText(Prefs.getEmergencyContact(this))
+        binding.etFleetCode.setText(Prefs.getFleetCode(this))
 
         // Show verified phone (read-only — from Firebase Auth)
         val riderPhone = Prefs.getRiderPhone(this)
@@ -44,9 +45,8 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun onGetStarted() {
-        val name       = binding.etName.text?.toString()?.trim() ?: ""
-        val fleetPhone = binding.etFleetManager.text?.toString()?.trim() ?: ""
-        val emergency  = binding.etEmergency.text?.toString()?.trim() ?: ""
+        val name = binding.etName.text?.toString()?.trim() ?: ""
+        val code = binding.etFleetCode.text?.toString()?.trim()?.uppercase() ?: ""
 
         if (name.isEmpty()) {
             binding.etName.error = "Your name is required"
@@ -54,35 +54,63 @@ class SetupActivity : AppCompatActivity() {
             return
         }
 
+        // Fleet code is optional — a rider can finish setup without one and add it later.
+        if (code.isBlank()) {
+            persistProfile(name, code = "", managerPhone = "", emergency = "")
+            return
+        }
+        if (code.length != 6) {
+            binding.etFleetCode.error = "The fleet code is 6 characters"
+            binding.etFleetCode.requestFocus()
+            return
+        }
+
+        setLoading(true)
+        // Resolve the code → manager phone + fleet emergency contact
+        db.collection("fleets").document(code).get()
+            .addOnSuccessListener { snap ->
+                if (!snap.exists()) {
+                    setLoading(false)
+                    binding.etFleetCode.error = "Code not found — check with your manager"
+                    binding.etFleetCode.requestFocus()
+                    return@addOnSuccessListener
+                }
+                val managerPhone = snap.getString("managerPhone") ?: ""
+                val emergency    = snap.getString("emergencyContact") ?: ""
+                persistProfile(name, code, managerPhone, emergency)
+            }
+            .addOnFailureListener {
+                setLoading(false)
+                binding.etFleetCode.error = "Couldn't verify code — check your connection"
+            }
+    }
+
+    private fun persistProfile(name: String, code: String, managerPhone: String, emergency: String) {
         setLoading(true)
 
-        // Persist locally
         Prefs.setRiderName(this, name)
-        Prefs.setFleetManagerPhone(this, fleetPhone)
+        Prefs.setFleetCode(this, code)
+        Prefs.setFleetManagerPhone(this, managerPhone)
         Prefs.setEmergencyContact(this, emergency)
-        // Enable SMS if either alert number is provided
-        Prefs.setSmsEnabled(this, fleetPhone.isNotBlank() || emergency.isNotBlank())
+        Prefs.setSmsEnabled(this, managerPhone.isNotBlank() || emergency.isNotBlank())
 
         // Push profile to Firestore (non-blocking — proceed regardless of outcome)
         val deviceId   = Prefs.getDeviceId(this)
         val riderPhone = Prefs.getRiderPhone(this)
-        FirebaseFirestore.getInstance()
-            .collection("riders").document(deviceId)
+        db.collection("riders").document(deviceId)
             .set(
                 hashMapOf<String, Any?>(
                     "riderName"         to name,
                     "riderPhone"        to riderPhone,
-                    "fleetManagerPhone" to fleetPhone,
+                    "managerId"         to code,
+                    "fleetManagerPhone" to managerPhone,
                     "emergencyContact"  to emergency,
                     "connected"         to false,
                     "profileUpdatedAt"  to FieldValue.serverTimestamp()
                 ),
                 SetOptions.merge()
             )
-            .addOnCompleteListener {
-                // Always proceed — Firestore push failure is non-fatal
-                finishSetup()
-            }
+            .addOnCompleteListener { finishSetup() }
     }
 
     private fun finishSetup() {

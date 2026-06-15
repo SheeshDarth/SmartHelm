@@ -32,9 +32,16 @@ object Prefs {
     fun setRiderPhone(ctx: Context, phone: String) =
         ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit { putString("rider_phone", phone) }
 
-    // ── Fleet manager ────────────────────────────────────────────────
+    // ── Fleet ────────────────────────────────────────────────────────
 
-    /** Fleet manager's phone — receives SMS on every alert. */
+    /** The 6-char fleet code the rider entered in setup. Equals the dashboard managerId. */
+    fun getFleetCode(ctx: Context): String =
+        ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString("fleet_code", "") ?: ""
+
+    fun setFleetCode(ctx: Context, code: String) =
+        ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit { putString("fleet_code", code) }
+
+    /** Fleet manager's phone — receives SMS on every alert. Resolved from the fleet doc. */
     fun getFleetManagerPhone(ctx: Context): String =
         ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString("fleet_manager_phone", "") ?: ""
 

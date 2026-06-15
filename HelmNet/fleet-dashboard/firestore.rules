@@ -2,6 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Fleet documents ─────────────────────────────────────────────────
+    // One doc per fleet manager, keyed by their derived 6-char code.
+    // Holds the manager phone + fleet emergency contact that riders link to
+    // when they enter the code in app setup. Any authenticated user may read
+    // (riders link up) or write (the manager portal registers the fleet).
+    match /fleets/{code} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // ── Rider status documents ──────────────────────────────────────────
     // Identity note: a rider device's document id is a random UUID
     // (Prefs.getDeviceId), which is NOT the same as the Firebase Auth uid

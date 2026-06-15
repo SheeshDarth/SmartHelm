@@ -88,14 +88,14 @@
             android:paddingStart="4dp"
             android:layout_marginBottom="28dp" />
 
-        <!-- ─── FLEET MANAGER ────────────────────────── -->
+        <!-- ─── FLEET CODE ───────────────────────────── -->
         <View android:layout_width="match_parent" android:layout_height="1dp"
             android:background="#1c1c1c" android:layout_marginBottom="24dp" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="FLEET MANAGER"
+            android:text="FLEET CODE"
             android:textSize="11sp"
             android:textColor="#444444"
             android:letterSpacing="0.1"
@@ -104,7 +104,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Your manager receives an SMS the moment a drowsiness alert fires."
+            android:text="Enter the 6-character code from your fleet manager. It links your manager and emergency contact automatically — they're alerted the moment drowsiness is detected."
             android:textSize="12sp"
             android:textColor="#555555"
             android:lineSpacingMultiplier="1.4"
@@ -113,52 +113,19 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Fleet manager phone  (+91XXXXXXXXXX)"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="28dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_fleet_manager"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="phone"
-                android:textColor="#FFFFFF"
-                android:imeOptions="actionNext" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- ─── EMERGENCY CONTACT ───────────────────── -->
-        <View android:layout_width="match_parent" android:layout_height="1dp"
-            android:background="#1c1c1c" android:layout_marginBottom="24dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="EMERGENCY CONTACT"
-            android:textSize="11sp"
-            android:textColor="#444444"
-            android:letterSpacing="0.1"
-            android:layout_marginBottom="6dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="A family member or friend also alerted when you're drowsy."
-            android:textSize="12sp"
-            android:textColor="#555555"
-            android:lineSpacingMultiplier="1.4"
-            android:layout_marginBottom="10dp" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Emergency contact phone  (+91XXXXXXXXXX)"
+            android:hint="Fleet code  (e.g. K6JB5G)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="36dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_emergency"
+                android:id="@+id/et_fleet_code"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="phone"
+                android:inputType="textCapCharacters"
+                android:maxLength="6"
                 android:textColor="#FFFFFF"
+                android:letterSpacing="0.25"
+                android:textSize="18sp"
+                android:fontFamily="monospace"
                 android:imeOptions="actionDone" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -192,7 +159,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Fleet manager and emergency contact fields are optional but strongly recommended."
+            android:text="Ask your fleet manager for your code. Don't have one yet? Leave it blank — you can add it later from settings."
             android:textColor="#333333"
             android:textSize="12sp"
             android:gravity="center"

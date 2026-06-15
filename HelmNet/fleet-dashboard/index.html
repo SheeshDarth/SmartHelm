@@ -354,8 +354,70 @@ footer{
 <!-- Firebase config — gitignored, loaded as plain script so it works in all browsers
      including Firefox (which blocks file:// ES module imports). Sets window._firebaseConfig. -->
 <script src="./firebase.config.js"></script>
+<style>
+/* ── MANAGER LOGIN GATE ── */
+#mgr-gate{position:fixed;inset:0;z-index:9999;background:rgba(9,9,11,.97);
+  display:flex;align-items:center;justify-content:center;padding:20px}
+#mgr-gate.hidden{display:none}
+.gate-card{width:390px;max-width:92vw;background:linear-gradient(180deg,#1d1d1d,#151515);
+  border:1px solid #2a2a2a;border-radius:14px;padding:30px 28px;box-shadow:0 24px 70px rgba(0,0,0,.7)}
+.gate-logo{font-size:1.25rem;font-weight:800;margin-bottom:20px;letter-spacing:.3px}
+.gate-logo span{color:var(--green)}
+.gate-title{font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:6px}
+.gate-sub{font-size:.76rem;color:var(--mid);margin-bottom:14px;line-height:1.55}
+.gate-label{display:block;font-size:.6rem;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.09em;margin:16px 0 6px}
+.gate-phone{display:flex;align-items:center;gap:9px;background:#242424;border:1px solid #3a3a3a;
+  border-radius:8px;padding:0 12px;transition:border-color .2s}
+.gate-phone:focus-within{border-color:var(--green)}
+.gate-cc{color:var(--mid);font-family:var(--mono);font-size:.85rem}
+.gate-phone input{flex:1;background:transparent;border:none;outline:none;color:#fff;
+  padding:11px 0;font-size:.95rem;font-family:var(--mono);letter-spacing:.05em}
+.gate-otp{width:100%;background:#242424;border:1px solid #3a3a3a;border-radius:8px;color:#fff;
+  padding:13px;font-size:1.5rem;text-align:center;letter-spacing:.5em;font-family:var(--mono);outline:none}
+.gate-otp:focus{border-color:var(--green)}
+.gate-btn{width:100%;margin-top:22px;background:var(--green);color:#000;border:none;border-radius:8px;
+  padding:13px;font-size:.9rem;font-weight:800;cursor:pointer;letter-spacing:.03em;transition:opacity .2s}
+.gate-btn:disabled{opacity:.5;cursor:default}
+.gate-link{display:block;width:100%;margin-top:14px;background:transparent;border:none;
+  color:var(--mid);font-size:.72rem;cursor:pointer}
+.gate-error{color:var(--red);font-size:.74rem;margin-top:14px;min-height:1em;text-align:center}
+.gate-note{font-size:.66rem;color:var(--dim);margin-top:18px;line-height:1.5;text-align:center}
+</style>
 </head>
 <body>
+
+<!-- ══════════ MANAGER LOGIN GATE ══════════ -->
+<div id="mgr-gate">
+  <div class="gate-card">
+    <div class="gate-logo">△ Smart<span>Helm</span></div>
+    <div class="gate-title">Fleet Manager Login</div>
+    <div class="gate-sub">Sign in with your phone to open your fleet dashboard. You'll get a 6-character code to share with your riders.</div>
+
+    <!-- Step 1: phone + fleet emergency contact -->
+    <div id="gate-step1">
+      <label class="gate-label">Your phone number</label>
+      <div class="gate-phone"><span class="gate-cc">+91</span>
+        <input id="gate-phone" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>
+      <label class="gate-label">Fleet emergency contact</label>
+      <div class="gate-phone"><span class="gate-cc">+91</span>
+        <input id="gate-emergency" type="tel" inputmode="numeric" maxlength="10" placeholder="alerted with you on drowsiness"></div>
+      <button id="gate-send" class="gate-btn">Send OTP</button>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div id="gate-step2" style="display:none">
+      <label class="gate-label">Enter the 6-digit code sent to your phone</label>
+      <input id="gate-otp" type="tel" inputmode="numeric" maxlength="6" class="gate-otp" placeholder="••••••">
+      <button id="gate-verify" class="gate-btn">Verify &amp; Enter</button>
+      <button id="gate-back" class="gate-link">← change number</button>
+    </div>
+
+    <div id="gate-error" class="gate-error"></div>
+    <div id="recaptcha-container"></div>
+    <div class="gate-note">Riders never use this dashboard — they only enter your fleet code in the app.</div>
+  </div>
+</div>
 
 <!-- ══════════ HEADER ══════════ -->
 <header>
@@ -384,16 +446,16 @@ footer{
 </header>
 
 <!-- ══════════ FLEET MANAGER BAR ══════════ -->
-<div id="mgr-bar" style="background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:6px 20px;display:flex;align-items:center;gap:10px;font-size:.68rem;flex-shrink:0">
-  <span style="color:var(--dim);font-weight:600;letter-spacing:.04em">FLEET MANAGER</span>
-  <input id="mgr-input" type="text" placeholder="Enter your phone number (e.g. +919876543210)"
-    style="background:#252525;border:1px solid #3a3a3a;color:var(--text);padding:4px 10px;border-radius:5px;font-size:.68rem;width:240px;outline:none;font-family:var(--mono)">
-  <button onclick="window._setManagerCode()"
-    style="background:var(--green);color:#000;border:none;padding:4px 14px;border-radius:5px;font-size:.68rem;font-weight:800;cursor:pointer;letter-spacing:.04em">CONNECT</button>
-  <span id="mgr-status" style="color:var(--dim);font-size:.65rem">Showing all riders</span>
-  <span id="mgr-code-box" style="display:none;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);border-radius:5px;padding:3px 10px;font-family:var(--mono);font-size:.75rem;font-weight:800;color:#00e5ff;letter-spacing:.1em"></span>
-  <span id="mgr-code-hint" style="display:none;color:var(--dim);font-size:.6rem">← share this code with your riders (they enter your phone in setup)</span>
-  <button id="mgr-clear" onclick="window._clearManagerCode()" style="display:none;background:transparent;border:1px solid #3a3a3a;color:var(--mid);padding:3px 10px;border-radius:5px;font-size:.62rem;cursor:pointer">✕ Clear</button>
+<div id="mgr-bar" style="background:#1a1a1a;border-bottom:1px solid #2a2a2a;padding:6px 20px;display:flex;align-items:center;gap:12px;font-size:.68rem;flex-shrink:0">
+  <span style="color:var(--dim);font-weight:600;letter-spacing:.04em">FLEET CODE</span>
+  <span id="mgr-code-box" style="background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);border-radius:5px;padding:3px 12px;font-family:var(--mono);font-size:.8rem;font-weight:800;color:#00e5ff;letter-spacing:.18em">------</span>
+  <span id="mgr-code-hint" style="color:var(--dim);font-size:.6rem">← share with your riders</span>
+  <span style="flex:1"></span>
+  <span style="color:var(--dim)">Manager</span>
+  <span id="mgr-phone-lbl" style="font-family:var(--mono);color:var(--text)">—</span>
+  <span style="color:var(--dim)">Emergency</span>
+  <span id="mgr-emergency-lbl" style="font-family:var(--mono);color:var(--text)">—</span>
+  <button id="mgr-logout" onclick="window._managerLogout()" style="background:transparent;border:1px solid #3a3a3a;color:var(--mid);padding:3px 12px;border-radius:5px;font-size:.62rem;cursor:pointer">Logout</button>
 </div>
 
 <!-- ══════════ STATS BAR ══════════ -->
@@ -1508,9 +1570,9 @@ renderTick();
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, onSnapshot }
+import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getAuth, signInAnonymously }
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // firebase.config.js is loaded as a plain <script> above and sets window._firebaseConfig.
@@ -1540,59 +1602,84 @@ function managerCodeFromPhone(phone) {
   return code;
 }
 
-// ── Fleet manager filter ─────────────────────────────────────────────
-// managerCode is always the derived 6-char code, never the raw phone string.
-let managerCode = localStorage.getItem('sh_manager_code') || '';
+// ── Fleet manager auth gate ──────────────────────────────────────────
+// The dashboard is manager-only: nothing renders until the manager signs in
+// with their phone (Firebase Phone Auth OTP). managerCode is their derived
+// 6-char code and is ALWAYS the active filter — only their fleet's riders show.
+let managerCode  = '';
+let managerPhone = '';
+let confirmationResult = null;
 
-function _showManagerCode(code) {
-  const box  = document.getElementById('mgr-code-box');
-  const hint = document.getElementById('mgr-code-hint');
-  if (box)  { box.textContent = code; box.style.display = ''; }
-  if (hint) hint.style.display = '';
+const norm10 = s => { const d = (s || '').replace(/\D/g, ''); return d.length > 10 ? d.slice(-10) : d; };
+const gateError = m => { document.getElementById('gate-error').textContent = m || ''; };
+
+function showFleetBar(code, phone, emergency) {
+  document.getElementById('mgr-code-box').textContent      = code;
+  document.getElementById('mgr-phone-lbl').textContent     = phone     ? '+91 ' + phone     : '—';
+  document.getElementById('mgr-emergency-lbl').textContent = emergency ? '+91 ' + emergency : '—';
 }
 
-window._setManagerCode = () => {
-  const phone = document.getElementById('mgr-input').value.trim();
-  if (!phone) return;
-  const code = managerCodeFromPhone(phone);
-  managerCode = code;
-  localStorage.setItem('sh_manager_code', code);
-  localStorage.setItem('sh_manager_phone', phone);
-  document.getElementById('mgr-status').textContent = 'Connected ·';
-  document.getElementById('mgr-status').style.color = 'var(--green)';
-  _showManagerCode(code);
-  document.getElementById('mgr-clear').style.display = '';
-  Object.entries(liveData).forEach(([id, data]) => injectLiveData(id, data));
-};
-window._clearManagerCode = () => {
-  managerCode = '';
-  localStorage.removeItem('sh_manager_code');
+window._managerLogout = async () => {
+  try { await signOut(auth); } catch (e) {}
   localStorage.removeItem('sh_manager_phone');
-  document.getElementById('mgr-input').value = '';
-  document.getElementById('mgr-status').textContent = 'Showing all riders';
-  document.getElementById('mgr-status').style.color = 'var(--dim)';
-  document.getElementById('mgr-clear').style.display = 'none';
-  const box  = document.getElementById('mgr-code-box');
-  const hint = document.getElementById('mgr-code-hint');
-  if (box)  box.style.display = 'none';
-  if (hint) hint.style.display = 'none';
-  Object.entries(liveData).forEach(([id, data]) => injectLiveData(id, data));
+  location.reload();
 };
-// Restore saved state on load. Recompute the code from the saved phone rather
-// than trusting the cached code, so any change to the hash/normalisation applies
-// automatically on refresh without needing to Clear + reconnect.
-{
-  const savedPhone = localStorage.getItem('sh_manager_phone') || '';
-  if (savedPhone) {
-    managerCode = managerCodeFromPhone(savedPhone);
-    localStorage.setItem('sh_manager_code', managerCode);
-    document.getElementById('mgr-input').value = savedPhone;
-    document.getElementById('mgr-status').textContent = 'Connected ·';
-    document.getElementById('mgr-status').style.color = 'var(--green)';
-    _showManagerCode(managerCode);
-    document.getElementById('mgr-clear').style.display = '';
+
+// Restrict the gate inputs to digits only.
+['gate-phone', 'gate-emergency', 'gate-otp'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    e.target.value = e.target.value.replace(/\D/g, '');
+  });
+});
+
+// Step 1 → send OTP
+document.getElementById('gate-send').addEventListener('click', async () => {
+  const phone10 = norm10(document.getElementById('gate-phone').value);
+  const emerg10 = norm10(document.getElementById('gate-emergency').value);
+  if (phone10.length !== 10) return gateError('Enter a valid 10-digit phone number.');
+  if (emerg10 && emerg10.length !== 10) return gateError('Emergency number must be 10 digits.');
+  gateError('');
+  const btn = document.getElementById('gate-send');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    if (!window._recaptcha) {
+      window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+    }
+    confirmationResult       = await signInWithPhoneNumber(auth, '+91' + phone10, window._recaptcha);
+    window._pendingEmergency = emerg10;
+    document.getElementById('gate-step1').style.display = 'none';
+    document.getElementById('gate-step2').style.display = '';
+    document.getElementById('gate-otp').focus();
+  } catch (e) {
+    console.error('OTP send failed:', e);
+    gateError('Could not send OTP. Add this number as a Firebase test number, and open the dashboard over http://localhost (not file://).');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send OTP';
   }
-}
+});
+
+// Step 2 → verify OTP (onAuthStateChanged completes the rest)
+document.getElementById('gate-verify').addEventListener('click', async () => {
+  const code = (document.getElementById('gate-otp').value || '').replace(/\D/g, '');
+  if (code.length !== 6) return gateError('Enter the 6-digit code.');
+  if (!confirmationResult) return gateError('Session expired — go back and resend.');
+  gateError('');
+  const btn = document.getElementById('gate-verify');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  try {
+    await confirmationResult.confirm(code);
+  } catch (e) {
+    gateError('Incorrect code — try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Verify & Enter';
+  }
+});
+
+document.getElementById('gate-back').addEventListener('click', () => {
+  document.getElementById('gate-step2').style.display = 'none';
+  document.getElementById('gate-step1').style.display = '';
+  gateError('');
+});
 
 // ── Slot management ──────────────────────────────────────────────────
 const deviceToSlot = {};
@@ -1832,6 +1919,8 @@ function setFbStatus(ok, label) {
 
 // ── Firestore listener ───────────────────────────────────────────────
 function startListening() {
+  if (window._listening) return;   // onAuthStateChanged can fire more than once
+  window._listening = true;
   startSafetyMonitor();
   if (Notification.permission === 'default') Notification.requestPermission();
   onSnapshot(collection(db, 'riders'),
@@ -1860,13 +1949,43 @@ function startListening() {
   );
 }
 
-signInAnonymously(auth)
-  .then(() => { setFbStatus(true, 'FIREBASE'); startListening(); })
-  .catch(err => {
-    console.warn('SmartHelm Firebase auth:', err.message);
-    setFbStatus(false, 'AUTH ERR');
-    startListening();
-  });
+// ── Auth gate → enter dashboard ──────────────────────────────────────
+// On a verified phone login (or a persisted session on refresh), derive the
+// manager's code, sync the /fleets/{code} doc, reveal the dashboard, and start
+// listening — filtered to this manager's riders only.
+async function enterDashboard(user) {
+  const phone10 = norm10(user.phoneNumber) || norm10(localStorage.getItem('sh_manager_phone'));
+  managerPhone  = phone10;
+  managerCode   = managerCodeFromPhone(phone10);
+  localStorage.setItem('sh_manager_phone', phone10);
+
+  let emergency = window._pendingEmergency || '';
+  try {
+    const fref = doc(db, 'fleets', managerCode);
+    if (emergency) {
+      await setDoc(fref, { managerPhone: phone10, emergencyContact: emergency,
+                           updatedAt: new Date().toISOString() }, { merge: true });
+    } else {
+      const snap = await getDoc(fref);
+      if (snap.exists()) emergency = snap.data().emergencyContact || '';
+      await setDoc(fref, { managerPhone: phone10, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  } catch (e) { console.warn('Fleet doc sync failed:', e.message); }
+
+  showFleetBar(managerCode, phone10, emergency);
+  document.getElementById('mgr-gate').classList.add('hidden');
+  setFbStatus(true, 'FIREBASE');
+  startListening();
+}
+
+onAuthStateChanged(auth, user => {
+  if (user && user.phoneNumber) {
+    enterDashboard(user);
+  } else {
+    // Not signed in (or a stale anonymous session) — keep the gate up.
+    document.getElementById('mgr-gate').classList.remove('hidden');
+  }
+});
 </script>
 </body>
 </html>
