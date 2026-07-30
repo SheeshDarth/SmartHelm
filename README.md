@@ -79,8 +79,8 @@ cd SmartHelm/HelmNet
 ./setup_rpi.sh
 
 # Configure
-cp smarthelm/backend/config.py.example smarthelm/backend/config.py
-# Edit HELMET_ID, EMERGENCY_CONTACT, FLEET_MANAGER_PHONE
+# Edit smarthelm/backend/config.py directly:
+# set HELMET_ID, EMERGENCY_CONTACT, FLEET_MANAGER_PHONE
 
 # Run
 source ~/smarthelm-venv/bin/activate
@@ -103,6 +103,24 @@ cp firebase.config.js.example firebase.config.js   # fill in Firebase config
 # Open index.html in a browser, or:
 firebase serve
 ```
+
+### No Raspberry Pi handy? Run it on a laptop webcam
+
+See [`HelmNet/README.md`](HelmNet/README.md) for a webcam-only dev/demo path — same
+MediaPipe eye-tracking pipeline, no Pi or sensors required.
+
+---
+
+## Documentation
+
+This project went through a full product/engineering planning pass before
+implementation:
+
+- [`HelmNet/PRD.md`](HelmNet/PRD.md) — product requirements
+- [`HelmNet/ARCHITECTURE.md`](HelmNet/ARCHITECTURE.md) — system architecture
+- [`HelmNet/TRD.md`](HelmNet/TRD.md) — technical requirements / design decisions
+- [`HelmNet/context.md`](HelmNet/context.md) — build changelog
+- [`docs/SmartHelm_Unisys_Innovation_Report.pdf`](docs/SmartHelm_Unisys_Innovation_Report.pdf) — innovation-challenge writeup
 
 ---
 
